@@ -1,0 +1,22 @@
+# Local environment. For now it only runs the deliberately vulnerable lab.
+# Database, Redis and Ollama will be added with the backend.
+services:
+  lab:
+    build: ./vulnerable-lab
+    ports:
+      - "8001:8001"
+    environment:
+      AEGIS_LAB_MODE: vulnerable
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  lab-patched:
+    build: ./vulnerable-lab
+    profiles: ["compare"]
+    ports:
+      - "8002:8001"
+    environment:
+      AEGIS_LAB_MODE: patched
