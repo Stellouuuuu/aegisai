@@ -1,0 +1,60 @@
+# ─── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+
+# ─── Tests & couverture ───────────────────────────────────
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ─── Secrets & config locale ──────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+config.local.*
+
+# ─── Données & artefacts de scan ──────────────────────────
+# Les rapports et findings générés ne sont pas versionnés
+reports/
+findings/
+*.sarif
+scan-results/
+*.sqlite3
+
+# ─── Node / Frontend ──────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+*.log
+
+# ─── Docker / infra ───────────────────────────────────────
+*.pid
+docker-compose.override.yml
+
+# ─── IDE / OS ─────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ─── Modèles & données volumineuses ───────────────────────
+*.gguf
+*.bin
+models/
+datasets/
