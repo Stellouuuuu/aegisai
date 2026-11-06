@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from engine.attacks.data_leakage import DataLeakageModule
 from engine.attacks.output_handling import OutputSecurityModule
 from engine.attacks.prompt_injection import PromptInjectionModule
@@ -24,8 +26,12 @@ def module_class_by_id(module_id: str) -> type:
     raise KeyError(f"No module with id {module_id!r}")
 
 
-def build_modules(names: list[str]) -> list[AttackModule]:
+def build_modules(
+    names: list[str], options: dict[str, dict[str, Any]] | None = None
+) -> list[AttackModule]:
+    """Instantiate modules by name; `options` maps a module name to constructor kwargs."""
     unknown = [n for n in names if n not in MODULES]
     if unknown:
         raise KeyError(f"Unknown module(s): {', '.join(unknown)}. Available: {', '.join(MODULES)}")
-    return [MODULES[n]() for n in names]
+    options = options or {}
+    return [MODULES[n](**options.get(n, {})) for n in names]

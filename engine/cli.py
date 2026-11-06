@@ -48,6 +48,18 @@ def _target_from(cfg: dict[str, Any]) -> TargetConfig:
     )
 
 
+def _module_options(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Tell the data leakage module which fake secret was planted in the target's context."""
+    opts: dict[str, Any] = {}
+    canary = args.canary or cfg.get("canary")
+    markers = args.system_prompt_marker or cfg.get("system_prompt_markers")
+    if canary:
+        opts["canary"] = canary
+    if markers:
+        opts["system_prompt_markers"] = tuple(markers)
+    return {"data_leakage": opts} if opts else {}
+
+
 def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
     cfg: dict[str, Any] = load_config(args.config) if args.config else {}
     if args.url:
@@ -62,6 +74,8 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         cfg["auth"] = {"type": "bearer", "token": args.auth_bearer}
     if args.min_interval is not None:
         cfg["min_interval"] = args.min_interval
+    if args.timeout is not None:
+        cfg["timeout"] = args.timeout
     return cfg
 
 
@@ -95,7 +109,7 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
     module_names = (args.modules.split(",") if args.modules
                     else cfg.get("modules") or list(MODULES))
     try:
-        modules = build_modules(module_names)
+        modules = build_modules(module_names, _module_options(args, cfg))
         connector = HttpConnector(_target_from(cfg), client=client)
     except (KeyError, TypeError) as e:
         print(f"Configuration error: {e}", file=sys.stderr)
@@ -154,8 +168,16 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--tool-calls-path", help="JSONPath of reported tool calls")
     s.add_argument("--auth-bearer", help="Bearer token, or ${ENV_VAR}")
     s.add_argument("--modules", help=f"comma separated: {','.join(MODULES)}")
+    s.add_argument(
+        "--canary", help="fake secret planted in the app's context (default SECRET_TEST_4821)"
+    )
+    s.add_argument(
+        "--system-prompt-marker", action="append",
+        help="distinctive fragment of the app's system prompt (repeatable); weak evidence only",
+    )
     s.add_argument("--depth", choices=list(DEPTH_REPEATS), default="standard")
     s.add_argument("--min-interval", type=float, help="seconds between requests")
+    s.add_argument("--timeout", type=float, help="seconds to wait for each reply (slow models)")
     s.add_argument("--out", default="aegis-report.json")
     s.add_argument("--confirm-authorized", action="store_true",
                    help="confirm you own the target or have written authorization")

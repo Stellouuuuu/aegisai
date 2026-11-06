@@ -70,3 +70,12 @@ def test_pdf_report_from_scan(tmp_path, monkeypatch) -> None:
     assert main(["report", str(js), "--format", "pdf", "-o", str(pdf)]) == 0
     data = pdf.read_bytes()
     assert data.startswith(b"%PDF") and len(data) > 3000
+
+
+def test_cli_custom_canary_option(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    out = tmp_path / "c.json"
+    args = BASE + ["--modules", "data_leakage", "--canary", "OTHER_SECRET_9", "--out", str(out)]
+    assert main(args, TestClient(lab.app)) == 0
+    # The lab leaks SECRET_TEST_4821, not the declared canary: nothing is proven.
+    assert json.loads(out.read_text())["findings"] == []
