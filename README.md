@@ -43,6 +43,8 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Profiler, orchestrateur complet (concurrence, annulation) | à faire |
 | RAG (v2), adversarial (v3), white-box et SARIF (v4) | à faire |
 
+**Validation sur un vrai LLM (Mistral via Ollama, 5 scans par mode) :** score moyen 70 sur la variante vulnérable contre 99,6 sur la variante durcie, mais rappel partiel (de 2/5 à 5/5 selon le scénario, TS-02 jamais détecté). Détails et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
+
 **Limites connues :** le labo est un simulateur à règles (pas un vrai LLM), donc les chiffres ci-dessus prouvent que la chaîne fonctionne, pas la qualité des payloads face à un vrai modèle. Seuls 5 scénarios du catalogue sont implémentés (PI-02, DL-01, DL-02, OS-01, TS-02). Voir [`ROADMAP.md`](./ROADMAP.md).
 
 ## Démarrage rapide
