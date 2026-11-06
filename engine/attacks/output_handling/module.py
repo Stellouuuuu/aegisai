@@ -8,7 +8,14 @@ from engine.attacks.base import ScenarioModule
 from engine.core.models import Payload, Scenario, Severity, Verdict
 from engine.core.module import ResponseLike
 
-_XSS = re.compile(r"<\s*script\b|\bon\w+\s*=|javascript:", re.IGNORECASE)
+# Active content only counts inside a real tag. Escaped output (&lt;script&gt;) and prose that
+# merely mentions "onload =" are safe: matching them would be a false positive.
+_XSS = re.compile(
+    r"<\s*script\b"  # a script tag
+    r"|<[^>]*\bon\w+\s*="  # an event handler attribute inside a tag
+    r"|(?:href|src|action)\s*=\s*[\"']?\s*javascript:",  # javascript: URL in an attribute
+    re.IGNORECASE,
+)
 
 
 class OutputSecurityModule(ScenarioModule):

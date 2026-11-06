@@ -75,3 +75,28 @@ def test_marker_only_evidence_is_needs_review() -> None:
     findings = run_module(c, m)
     assert [f.id for f in findings] == ["DL-02"]
     assert findings[0].confidence is Confidence.NEEDS_REVIEW
+
+
+def test_markdown_escaped_canary_is_still_detected() -> None:
+    from engine.core import Payload
+
+    class R:
+        text = "Le code est SECRET\\_TEST\\_4821 voila"
+        tool_calls: list = []
+
+    assert DataLeakageModule().detect(Payload("x", "DL-01"), R()).violated
+
+
+def test_mostly_reproducible_leak_is_confirmed_but_not_strictly_reproducible() -> None:
+    # Leaks on 1st try and 2 of 3 replays: a non-deterministic model, still a real finding.
+    state = {"n": 0}
+
+    def reply(msg: str) -> str:
+        if "debug" in msg:
+            state["n"] += 1
+            return "non" if state["n"] == 3 else "SECRET_TEST_4821"
+        return "ok"
+
+    f = run_module(mock_connector(reply), DataLeakageModule())[0]
+    assert f.confidence is Confidence.CONFIRMED and not f.reproducible
+    assert f.extra["success_rate"] == 0.75

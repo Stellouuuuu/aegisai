@@ -40,8 +40,8 @@ def run_module(
             continue
 
         rep = replay(connector, module, payload, repeats)
-        # Deterministic evidence + stable reproduction => confirmed; otherwise a human decides.
-        confirmed = verdict.deterministic and rep.reproducible
+        # Deterministic evidence + reliable reproduction => confirmed; otherwise a human decides.
+        confirmed = verdict.deterministic and rep.stable
         sc = module.scenario(sid)
         findings[sid] = Finding(
             id=sid,
@@ -58,6 +58,7 @@ def run_module(
             recommendation=sc.recommendation,
             reproducible=rep.reproducible,
             extra={"replay_hits": rep.hits, "replay_attempts": rep.attempts,
+                   "success_rate": round(rep.success_rate, 3),
                    "payloads_tried": tried[sid],
                    "tool_calls": list(response.tool_calls)},
         )

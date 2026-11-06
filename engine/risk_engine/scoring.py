@@ -28,7 +28,8 @@ def exploitability(finding: Finding) -> float:
     tried = max(1, int(finding.extra.get("payloads_tried", 1)))
     hits = finding.extra.get("replay_hits")
     attempts = finding.extra.get("replay_attempts")
-    stability = (hits / attempts) if attempts else 1.0
+    # The original observation counts as one success: 0 hits out of 3 replays is 1/4.
+    stability = ((hits + 1) / (attempts + 1)) if attempts else 1.0
     return round(stability / (1 + 0.25 * (tried - 1)), 3)
 
 
