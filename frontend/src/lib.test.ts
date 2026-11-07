@@ -4,6 +4,7 @@ import {
   grade,
   highlight,
   laneState,
+  openaiTemplate,
   statusTone,
   parseApiError,
   sortFindings,
@@ -64,6 +65,17 @@ describe("parseApiError", () => {
     );
     expect(msg).toBe("target.url: bad");
     expect(parseApiError(null, "fallback")).toBe("fallback");
+  });
+});
+
+describe("openaiTemplate", () => {
+  it("builds a chat-completions body with the prompt placeholder", () => {
+    const body = JSON.parse(openaiTemplate("gpt-x", false));
+    expect(body.model).toBe("gpt-x");
+    expect(body.messages[0].content).toBe("{{PROMPT}}");
+    expect("stream" in body).toBe(false);
+    expect(JSON.parse(openaiTemplate("gpt-x", true)).stream).toBe(true);
+    expect(JSON.parse(openaiTemplate("", false)).model).toBe("model-name");
   });
 });
 

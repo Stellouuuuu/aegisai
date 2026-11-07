@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "./api";
 import { go, useLoad } from "./hooks";
-import { DEPTHS, MODULES } from "./lib";
+import { DEPTHS, MODULES, OPENAI_PATHS, openaiTemplate } from "./lib";
 import type { Profile } from "./types";
 import { Chip, ErrorNote } from "./ui";
 
@@ -19,8 +19,27 @@ export function NewScan({ projectId }: { projectId: number }) {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState<"custom" | "openai">("custom");
+  const [model, setModel] = useState("");
+  const [stream, setStream] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profiling, setProfiling] = useState(false);
+
+  function chooseFormat(f: "custom" | "openai") {
+    setFormat(f);
+    if (f === "openai") {
+      setTemplate(openaiTemplate(model, stream));
+      setResponsePath(OPENAI_PATHS.response);
+      setToolPath(OPENAI_PATHS.tools);
+      if (authType === "none") setAuthType("bearer");
+    }
+  }
+
+  function changeOpenai(nextModel: string, nextStream: boolean) {
+    setModel(nextModel);
+    setStream(nextStream);
+    setTemplate(openaiTemplate(nextModel, nextStream));
+  }
 
   const toggle = (m: string) =>
     setModules((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
@@ -40,7 +59,15 @@ export function NewScan({ projectId }: { projectId: number }) {
       authType === "none"
         ? { type: "none" }
         : { type: authType, token: authRef, ...(authType === "api_key" ? { header_name: headerName } : {}) };
-    return { url, request_template, response_path: responsePath, tool_calls_path: toolPath || null, auth };
+    return {
+      url,
+      request_template,
+      response_path: responsePath,
+      tool_calls_path: toolPath || null,
+      auth,
+      stream: format === "openai" && stream,
+      timeout: 120,
+    };
   }
 
   async function suggest() {
@@ -94,6 +121,30 @@ export function NewScan({ projectId }: { projectId: number }) {
       <form className="stack" onSubmit={submit}>
         <section className="card form-card">
           <h2>1. Where the application listens</h2>
+          <div className="depth" role="radiogroup" aria-label="API format">
+            <label className={format === "custom" ? "depth-opt on" : "depth-opt"}>
+              <input type="radio" name="format" checked={format === "custom"} onChange={() => chooseFormat("custom")} />
+              <strong>Custom JSON API</strong>
+              <span>You describe the request and reply shape.</span>
+            </label>
+            <label className={format === "openai" ? "depth-opt on" : "depth-opt"}>
+              <input type="radio" name="format" checked={format === "openai"} onChange={() => chooseFormat("openai")} />
+              <strong>OpenAI compatible</strong>
+              <span>/v1/chat/completions: OpenAI, vLLM, LiteLLM, Ollama.</span>
+            </label>
+          </div>
+          {format === "openai" && (
+            <div className="grid-2">
+              <label>
+                Model name
+                <input value={model} onChange={(e) => changeOpenai(e.target.value, stream)} placeholder="gpt-4o-mini" />
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={stream} onChange={(e) => changeOpenai(model, e.target.checked)} />
+                <span>The endpoint streams its reply (server-sent events)</span>
+              </label>
+            </div>
+          )}
           <label>
             Chat endpoint URL
             <input

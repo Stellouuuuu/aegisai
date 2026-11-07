@@ -2,6 +2,21 @@ import type { AssessmentStatus, FindingRow, Severity } from "./types";
 
 export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low"];
 
+/** Request body of an OpenAI compatible /chat/completions call. */
+export function openaiTemplate(model: string, stream: boolean): string {
+  const body: Record<string, unknown> = {
+    model: model || "model-name",
+    messages: [{ role: "user", content: "{{PROMPT}}" }],
+  };
+  if (stream) body.stream = true;
+  return JSON.stringify(body);
+}
+
+export const OPENAI_PATHS = {
+  response: "$.choices[0].message.content",
+  tools: "$.choices[0].message.tool_calls",
+};
+
 export const MODULES: Record<string, { label: string; owasp: string; blurb: string }> = {
   prompt_injection: {
     label: "Prompt injection",
