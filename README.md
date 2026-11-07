@@ -91,12 +91,18 @@ cd frontend && npm install && npm run dev        # http://localhost:5173
 
 Créez un compte, ajoutez une cible, lancez un scan sur `http://localhost:8011/chat` avec le champ « Tool calls location » réglé sur `$.tool_calls`.
 
-### 3. Docker
+### 3. Docker (une commande)
 
 ```bash
-docker compose up -d                     # labo vulnérable sur :8001
-docker compose --profile compare up -d   # ajoute la variante corrigée sur :8002
+docker compose up --build                       # dashboard :8080, API :8000, labo :8011
+docker compose --profile compare up --build     # ajoute le labo corrigé sur :8002
+DASHBOARD_PORT=8090 docker compose up --build   # si le port 8080 est pris
 ```
+
+Ouvrez http://localhost:8080, créez un compte, puis scannez `http://lab:8001/chat` (avec « Tool calls
+location » réglé sur `$.tool_calls`). L'API ne peut joindre que les hôtes `lab` et `lab-patched`
+(garde SSRF, voir `AEGIS_ALLOWED_HOSTS` dans `docker-compose.yml`). Les ports sont liés à `127.0.0.1`
+et les comptes sont conservés dans le volume `aegis-data`.
 
 ## Ce que teste AegisAI
 
