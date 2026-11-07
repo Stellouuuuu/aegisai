@@ -58,6 +58,14 @@ export interface FindingRow {
   retested_at: string | null;
 }
 
+export interface Profile {
+  app_type: string;
+  confidence: "high" | "medium" | "low";
+  signals: { toward: string; weight: number; detail: string }[];
+  tools: string[];
+  modules: string[];
+}
+
 export interface NewScanBody {
   target: Record<string, unknown>;
   modules: string[];

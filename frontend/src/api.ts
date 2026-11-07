@@ -1,5 +1,5 @@
 import { parseApiError } from "./lib";
-import type { Assessment, FindingRow, NewScanBody, Project } from "./types";
+import type { Assessment, FindingRow, NewScanBody, Profile, Project } from "./types";
 
 const BASE = "/api";
 const KEY = "aegis.token";
@@ -96,6 +96,8 @@ export const api = {
   startScan: (projectId: number, body: NewScanBody) =>
     post<Assessment>(`/projects/${projectId}/assessments`, body),
   assessment: (id: number) => json<Assessment>(`/assessments/${id}`),
+  profile: (projectId: number, target: Record<string, unknown>) =>
+    post<Profile>(`/projects/${projectId}/profile`, { target, confirm_authorized: true }),
   cancel: (id: number) => post<Assessment>(`/assessments/${id}/cancel`),
   findings: (id: number) => json<FindingRow[]>(`/assessments/${id}/findings`),
   retest: (findingId: number) =>

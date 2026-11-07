@@ -2,7 +2,8 @@ import { useState } from "react";
 import { api } from "./api";
 import { go, useLoad } from "./hooks";
 import { DEPTHS, MODULES } from "./lib";
-import { ErrorNote } from "./ui";
+import type { Profile } from "./types";
+import { Chip, ErrorNote } from "./ui";
 
 export function NewScan({ projectId }: { projectId: number }) {
   const project = useLoad(() => api.project(projectId), [projectId]);
@@ -18,42 +19,58 @@ export function NewScan({ projectId }: { projectId: number }) {
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profiling, setProfiling] = useState(false);
 
   const toggle = (m: string) =>
     setModules((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+  /** The target settings shared by "suggest tests" and "start scan". */
+  function buildTarget(): Record<string, unknown> | string {
     let request_template: unknown;
     try {
       request_template = JSON.parse(template);
     } catch {
-      setError("The request template is not valid JSON.");
-      return;
+      return "The request template is not valid JSON.";
     }
     if (!template.includes("{{PROMPT}}")) {
-      setError("The request template must contain {{PROMPT}}, where the attack text is inserted.");
-      return;
-    }
-    if (modules.length === 0) {
-      setError("Select at least one test family.");
-      return;
+      return "The request template must contain {{PROMPT}}, where the attack text is inserted.";
     }
     const auth =
       authType === "none"
         ? { type: "none" }
         : { type: authType, token: authRef, ...(authType === "api_key" ? { header_name: headerName } : {}) };
+    return { url, request_template, response_path: responsePath, tool_calls_path: toolPath || null, auth };
+  }
+
+  async function suggest() {
+    setError(null);
+    if (!url) return setError("Enter the endpoint URL first.");
+    if (!confirmed) return setError("Tick the authorization box below first: profiling sends real requests.");
+    const target = buildTarget();
+    if (typeof target === "string") return setError(target);
+    setProfiling(true);
+    try {
+      const p = await api.profile(projectId, target);
+      setProfile(p);
+      setModules(p.modules);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setProfiling(false);
+    }
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const target = buildTarget();
+    if (typeof target === "string") return setError(target);
+    if (modules.length === 0) return setError("Select at least one test family.");
     setBusy(true);
     try {
       const a = await api.startScan(projectId, {
-        target: {
-          url,
-          request_template,
-          response_path: responsePath,
-          tool_calls_path: toolPath || null,
-          auth,
-        },
+        target,
         modules,
         depth,
         confirm_authorized: confirmed,
@@ -131,6 +148,24 @@ export function NewScan({ projectId }: { projectId: number }) {
 
         <section className="card form-card">
           <h2>2. What to test</h2>
+          <div className="suggest">
+            <button type="button" className="btn btn-ghost" disabled={profiling} onClick={suggest}>
+              {profiling ? "Probing..." : "Detect application type"}
+            </button>
+            {profile && (
+              <span className="muted">
+                Looks like <Chip tone={profile.confidence === "low" ? "warn" : "ok"}>{profile.app_type}</Chip>{" "}
+                ({profile.confidence} confidence). Test families were selected for you; you can change them.
+              </span>
+            )}
+          </div>
+          {profile && profile.signals.length > 0 && (
+            <ul className="signals">
+              {profile.signals.map((s) => (
+                <li key={s.detail}>{s.detail}</li>
+              ))}
+            </ul>
+          )}
           <div className="choice-grid">
             {Object.entries(MODULES).map(([id, m]) => (
               <label key={id} className={modules.includes(id) ? "choice on" : "choice"}>
