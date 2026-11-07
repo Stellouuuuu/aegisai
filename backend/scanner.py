@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable
 from typing import Any
@@ -19,6 +20,27 @@ from engine.risk_engine import assess, security_score
 
 DEPTH_REPEATS = {"quick": 1, "standard": 3, "deep": 5}
 ClientFactory = Callable[[], httpx.Client]
+
+
+class CancelRegistry:
+    """Assessment ids whose cancellation was requested. The running scan polls it between
+    requests, so it stops cleanly instead of being killed mid-write."""
+
+    def __init__(self) -> None:
+        self._ids: set[int] = set()
+        self._lock = threading.Lock()
+
+    def request(self, assessment_id: int) -> None:
+        with self._lock:
+            self._ids.add(assessment_id)
+
+    def is_requested(self, assessment_id: int) -> bool:
+        with self._lock:
+            return assessment_id in self._ids
+
+    def clear(self, assessment_id: int) -> None:
+        with self._lock:
+            self._ids.discard(assessment_id)
 
 
 def target_config(cfg: dict[str, Any]) -> TargetConfig:
@@ -42,9 +64,19 @@ def run_assessment(
     assessment_id: int,
     client_factory: ClientFactory | None,
     policy: TargetPolicy | None = None,
+    cancel: CancelRegistry | None = None,
 ) -> None:
+    cancel = cancel or CancelRegistry()
+
+    def stopped() -> bool:
+        return cancel.is_requested(assessment_id)
+
     a = storage.get_assessment(assessment_id)
     assert a is not None
+    if stopped():  # cancelled before it even started
+        storage.update_assessment(assessment_id, status="cancelled", finished_at=now())
+        cancel.clear(assessment_id)
+        return
     storage.update_assessment(assessment_id, status="running", progress=0)
     start = time.monotonic()
     connector = None
@@ -58,12 +90,18 @@ def run_assessment(
         modules = build_modules(a["modules"])
         findings: list[Finding] = []
         for i, module in enumerate(modules, 1):
-            findings += run_module(connector, module, repeats=DEPTH_REPEATS[a["depth"]])
+            findings += run_module(
+                connector, module, repeats=DEPTH_REPEATS[a["depth"]], should_stop=stopped
+            )
+            if stopped():
+                break
             storage.update_assessment(assessment_id, progress=round(100 * i / len(modules)))
+        cancelled = stopped()
         assess(findings)
         storage.add_findings(assessment_id, [f.to_dict() for f in findings])
         storage.update_assessment(
-            assessment_id, status="completed", progress=100,
+            assessment_id, status="cancelled" if cancelled else "completed",
+            **({} if cancelled else {"progress": 100}),
             security_score=security_score(findings),
             requests_sent=len(connector.history),
             duration_seconds=round(time.monotonic() - start, 2), finished_at=now(),
@@ -74,6 +112,8 @@ def run_assessment(
             requests_sent=len(connector.history) if connector else 0,
             duration_seconds=round(time.monotonic() - start, 2), finished_at=now(),
         )
+    finally:
+        cancel.clear(assessment_id)
 
 
 def open_findings(storage: Storage, assessment_id: int) -> list[Finding]:

@@ -53,6 +53,7 @@ def create_app(
     if allow_registration is None:
         allow_registration = os.environ.get("AEGIS_ALLOW_REGISTRATION", "1") == "1"
     throttle = LoginThrottle()
+    cancel = scanner.CancelRegistry()
     app = FastAPI(title="AegisAI API", version="0.1.0")
 
     def current_user(
@@ -156,7 +157,9 @@ def create_app(
         a = storage.create_assessment(
             project_id, body.target.model_dump(), body.modules, body.depth
         )
-        background.add_task(scanner.run_assessment, storage, a["id"], client_factory, policy)
+        background.add_task(
+            scanner.run_assessment, storage, a["id"], client_factory, policy, cancel
+        )
         return _redact(a)
 
     @app.get("/projects/{project_id}/assessments")
@@ -171,6 +174,16 @@ def create_app(
         assessment_id: int, user: dict[str, Any] = Depends(current_user)
     ) -> dict[str, Any]:
         return _redact(own_assessment(assessment_id, user))
+
+    @app.post("/assessments/{assessment_id}/cancel", status_code=202)
+    def cancel_assessment(
+        assessment_id: int, user: dict[str, Any] = Depends(current_user)
+    ) -> dict[str, Any]:
+        a = own_assessment(assessment_id, user)
+        if a["status"] not in ("pending", "running"):
+            raise HTTPException(409, f"assessment is already {a['status']}")
+        cancel.request(assessment_id)  # the scan stops after its current request
+        return _redact(a)
 
     @app.get("/assessments/{assessment_id}/findings")
     def list_findings(

@@ -5,7 +5,7 @@ The full orchestrator (profiles, depth, concurrency) will call these functions.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from engine.connector import ConnectorError, HttpConnector
 from engine.core.models import AppProfile, Confidence, Finding
@@ -13,6 +13,7 @@ from engine.core.module import AttackModule
 from engine.evaluators.replay import baseline_violates, replay
 
 BASELINE_PROMPT = "Bonjour, peux-tu m'aider ?"
+StopCheck = Callable[[], bool]
 
 
 def run_module(
@@ -20,13 +21,21 @@ def run_module(
     module: AttackModule,
     profile: AppProfile | None = None,
     repeats: int = 3,
+    should_stop: StopCheck | None = None,
 ) -> list[Finding]:
+    """Run one module. `should_stop` is polled between requests: when it returns True the
+    run ends cleanly and the findings proven so far are returned."""
+    stop = should_stop or (lambda: False)
     profile = profile or AppProfile()
+    if stop():
+        return []
     baseline = connector.send(BASELINE_PROMPT)
 
     findings: dict[str, Finding] = {}
     tried: dict[str, int] = {}
     for payload in module.generate_payloads(profile):
+        if stop():
+            break
         sid = payload.scenario_id
         if sid in findings or baseline_violates(module, sid, baseline):
             continue  # one proven finding per scenario is enough
@@ -66,11 +75,16 @@ def run_module(
 
 
 def run_scan(
-    connector: HttpConnector, modules: Iterable[AttackModule], repeats: int = 3
+    connector: HttpConnector,
+    modules: Iterable[AttackModule],
+    repeats: int = 3,
+    should_stop: StopCheck | None = None,
 ) -> list[Finding]:
     out: list[Finding] = []
     for m in modules:
-        out.extend(run_module(connector, m, repeats=repeats))
+        if should_stop and should_stop():
+            break
+        out.extend(run_module(connector, m, repeats=repeats, should_stop=should_stop))
     return out
 
 
