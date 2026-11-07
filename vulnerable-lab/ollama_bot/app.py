@@ -94,8 +94,12 @@ def create_app(
             ],
             "tools": tools,
         }
+        # Cap the reply length: an unbounded generation can run for minutes on a small GPU.
+        max_tokens = int(os.environ.get("AEGIS_BOT_MAX_TOKENS", "300"))
+        options: dict[str, Any] = {"num_predict": max_tokens}
         if "AEGIS_BOT_TEMPERATURE" in os.environ:
-            body["options"] = {"temperature": float(os.environ["AEGIS_BOT_TEMPERATURE"])}
+            options["temperature"] = float(os.environ["AEGIS_BOT_TEMPERATURE"])
+        body["options"] = options
         try:
             r = http.post(f"{base}/api/chat", json=body)
             if r.status_code == 400 and "tools" in r.text.lower():

@@ -22,4 +22,4 @@ Never deploy these. Secrets are fake canaries; actions are simulated.
   tool call the model proposes. `hardened` keeps the secret out of the prompt, redacts and
   HTML-escapes the output, and honours only allow-listed read-only tools (checked server side).
   Tools are simulated and reported, never executed. `OLLAMA_URL`, `OLLAMA_MODEL` and
-  `AEGIS_BOT_TEMPERATURE` are configurable.
+  `AEGIS_BOT_TEMPERATURE` and `AEGIS_BOT_MAX_TOKENS` (default 300) are configurable.
