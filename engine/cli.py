@@ -1,4 +1,4 @@
-"""Command line interface: `aegis scan` and `aegis report`."""
+"""Command line interface: `aegis scan`, `aegis profile` and `aegis report`."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from engine.attacks.registry import MODULES, build_modules
 from engine.connector import AuthConfig, ConnectorError, HttpConnector, TargetConfig
 from engine.demo import DemoUnavailableError, start_demo_lab
 from engine.orchestrator import run_scan
+from engine.profiler import profile_target
 from engine.reporting import build_report, render_summary
 from engine.risk_engine import assess
 
@@ -106,11 +107,13 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
     if "url" not in cfg:
         print("Missing target: use --url or a --config file with 'url'.", file=sys.stderr)
         return 2
-    module_names = (args.modules.split(",") if args.modules
+    auto = args.modules == "auto"
+    module_names = (args.modules.split(",") if args.modules and not auto
                     else cfg.get("modules") or list(MODULES))
     try:
-        modules = build_modules(module_names, _module_options(args, cfg))
         connector = HttpConnector(_target_from(cfg), client=client)
+        if not auto:
+            modules = build_modules(module_names, _module_options(args, cfg))
     except (KeyError, TypeError) as e:
         print(f"Configuration error: {e}", file=sys.stderr)
         return 2
@@ -119,6 +122,12 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
     if not ok:
         print(f"Connection test failed: {msg}", file=sys.stderr)
         return 3
+    if auto:
+        profile = profile_target(connector)
+        module_names = profile.modules
+        print(f"Profile: {profile.app_type.value} ({profile.confidence} confidence)",
+              file=sys.stderr)
+        modules = build_modules(module_names, _module_options(args, cfg))
     print(f"Connection OK. Running modules: {', '.join(module_names)} ({args.depth})",
           file=sys.stderr)
 
@@ -132,6 +141,35 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
     print(render_summary(report))
     print(f"Report written to {args.out}")
     return 1 if args.fail_on_findings and findings else 0
+
+
+def cmd_profile(args: argparse.Namespace, client: httpx.Client | None) -> int:
+    print(LEGAL, file=sys.stderr)
+    if not args.confirm_authorized:
+        print("Refusing to probe: pass --confirm-authorized to confirm you are "
+              "allowed to test this target.", file=sys.stderr)
+        return 2
+    cfg = _config_from_args(args)
+    if "url" not in cfg:
+        print("Missing target: use --url or a --config file with 'url'.", file=sys.stderr)
+        return 2
+    try:
+        connector = HttpConnector(_target_from(cfg), client=client)
+    except (KeyError, TypeError) as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
+        return 2
+    ok, msg = connector.test_connection()
+    if not ok:
+        print(f"Connection test failed: {msg}", file=sys.stderr)
+        return 3
+    profile = profile_target(connector)
+    print(f"Application type: {profile.app_type.value} ({profile.confidence} confidence)")
+    for sig in profile.signals:
+        print(f"  - toward {sig.toward} (+{sig.weight}): {sig.detail}")
+    if not profile.signals:
+        print("  - no sign of tools or documents: treated as a plain chatbot")
+    print(f"Recommended modules: {','.join(profile.modules)}")
+    return 0
 
 
 def cmd_report(args: argparse.Namespace) -> int:
@@ -167,7 +205,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--response-path", help="JSONPath of the reply, e.g. $.reply")
     s.add_argument("--tool-calls-path", help="JSONPath of reported tool calls")
     s.add_argument("--auth-bearer", help="Bearer token, or ${ENV_VAR}")
-    s.add_argument("--modules", help=f"comma separated: {','.join(MODULES)}")
+    s.add_argument(
+        "--modules", help=f"comma separated: {','.join(MODULES)}, or 'auto' to profile the target"
+    )
     s.add_argument(
         "--canary", help="fake secret planted in the app's context (default SECRET_TEST_4821)"
     )
@@ -183,6 +223,18 @@ def build_parser() -> argparse.ArgumentParser:
                    help="confirm you own the target or have written authorization")
     s.add_argument("--fail-on-findings", action="store_true", help="exit 1 if findings exist (CI)")
 
+    pr = sub.add_parser("profile", help="guess the application type (chatbot, agent, RAG)")
+    pr.add_argument("--config", help="JSON or YAML target configuration")
+    pr.add_argument("--url")
+    pr.add_argument("--request-template", help="JSON body with {{PROMPT}}")
+    pr.add_argument("--response-path", help="JSONPath of the reply, e.g. $.reply")
+    pr.add_argument("--tool-calls-path", help="JSONPath of reported tool calls")
+    pr.add_argument("--auth-bearer", help="Bearer token, or ${ENV_VAR}")
+    pr.add_argument("--min-interval", type=float, help="seconds between requests")
+    pr.add_argument("--timeout", type=float, help="seconds to wait for each reply")
+    pr.add_argument("--confirm-authorized", action="store_true",
+                    help="confirm you own the target or have written authorization")
+
     r = sub.add_parser("report", help="summarize a JSON report, or export it as PDF")
     r.add_argument("file")
     r.add_argument("--format", choices=["text", "pdf"], default="text")
@@ -195,6 +247,8 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
     try:
         if args.command == "scan":
             return cmd_scan(args, client)
+        if args.command == "profile":
+            return cmd_profile(args, client)
         return cmd_report(args)
     except ConnectorError as e:
         print(f"Error: {e}", file=sys.stderr)

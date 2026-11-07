@@ -15,6 +15,7 @@ from engine.attacks.registry import build_modules, module_class_by_id
 from engine.connector import AuthConfig, HttpConnector, TargetConfig
 from engine.core.models import Finding
 from engine.orchestrator import run_module
+from engine.profiler import profile_target
 from engine.reporting import build_report
 from engine.risk_engine import assess, security_score
 
@@ -114,6 +115,17 @@ def run_assessment(
         )
     finally:
         cancel.clear(assessment_id)
+
+
+def profile_config(
+    cfg: dict[str, Any],
+    client_factory: ClientFactory | None,
+    policy: TargetPolicy | None = None,
+) -> dict[str, Any]:
+    """Probe a target with harmless questions and return its guessed profile."""
+    if policy:
+        policy.check(cfg["url"])
+    return profile_target(make_connector(cfg, client_factory)).to_dict()
 
 
 def open_findings(storage: Storage, assessment_id: int) -> list[Finding]:

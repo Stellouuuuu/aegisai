@@ -63,6 +63,18 @@ class TargetIn(BaseModel):
     min_interval: float = Field(default=0.2, ge=0, le=60)
 
 
+class ProfileIn(BaseModel):
+    target: TargetIn
+    confirm_authorized: bool
+
+    @field_validator("confirm_authorized")
+    @classmethod
+    def must_confirm(cls, v: bool) -> bool:
+        if not v:
+            raise ValueError("you must confirm you own the target or are authorized to test it")
+        return v
+
+
 class AssessmentIn(BaseModel):
     target: TargetIn
     modules: list[str] = Field(default_factory=lambda: list(MODULES))

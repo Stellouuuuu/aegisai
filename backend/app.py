@@ -17,7 +17,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend import scanner
-from backend.schemas import AssessmentIn, CredentialsIn, ProjectIn
+from backend.schemas import AssessmentIn, CredentialsIn, ProfileIn, ProjectIn
 from backend.security import (
     DUMMY_HASH,
     LoginThrottle,
@@ -28,6 +28,7 @@ from backend.security import (
 )
 from backend.ssrf import TargetNotAllowedError, TargetPolicy
 from backend.storage import Storage
+from engine.connector import ConnectorError
 
 SESSION_HOURS = 12
 _bearer = HTTPBearer(auto_error=False)
@@ -161,6 +162,18 @@ def create_app(
             scanner.run_assessment, storage, a["id"], client_factory, policy, cancel
         )
         return _redact(a)
+
+    @app.post("/projects/{project_id}/profile")
+    def profile_project(
+        project_id: int, body: ProfileIn, user: dict[str, Any] = Depends(current_user)
+    ) -> dict[str, Any]:
+        own_project(project_id, user)
+        try:
+            return scanner.profile_config(body.target.model_dump(), client_factory, policy)
+        except TargetNotAllowedError as e:
+            raise HTTPException(422, str(e)) from e
+        except ConnectorError as e:
+            raise HTTPException(502, f"Could not reach the target: {e}") from e
 
     @app.get("/projects/{project_id}/assessments")
     def history(

@@ -202,3 +202,30 @@ def test_api_rejects_internal_target_by_default(tmp_path) -> None:
     r = api.post(f"/projects/{pid}/assessments", json=body)
     assert r.status_code == 422 and "non-public" in r.json()["detail"]
     assert api.get(f"/projects/{pid}/assessments").json() == []
+
+
+def test_profile_endpoint(api: TestClient) -> None:
+    pid = new_project(api)
+    ok = api.post(f"/projects/{pid}/profile", json={"target": TARGET, "confirm_authorized": True})
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["app_type"] == "agent" and "tool_abuse" in body["modules"]
+
+    no_auth = api.post(f"/projects/{pid}/profile", json={"target": TARGET,
+                                                         "confirm_authorized": False})
+    assert no_auth.status_code == 422
+    internal = {**TARGET, "url": "http://10.0.0.5/chat"}
+    blocked = api.post(f"/projects/{pid}/profile", json={"target": internal,
+                                                         "confirm_authorized": True})
+    assert blocked.status_code == 422
+
+
+def test_profile_endpoint_is_private(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    app = make_app(tmp_path)
+    alice = login(TestClient(app), "alice@example.com")
+    bob = login(TestClient(app), "bob@example.com")
+    pid = new_project(alice)
+    body = {"target": TARGET, "confirm_authorized": True}
+    assert bob.post(f"/projects/{pid}/profile", json=body).status_code == 404
+    assert TestClient(app).post(f"/projects/{pid}/profile", json=body).status_code == 401

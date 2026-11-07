@@ -79,3 +79,22 @@ def test_cli_custom_canary_option(tmp_path, monkeypatch) -> None:
     assert main(args, TestClient(lab.app)) == 0
     # The lab leaks SECRET_TEST_4821, not the declared canary: nothing is proven.
     assert json.loads(out.read_text())["findings"] == []
+
+
+def test_cli_profile_prints_type_and_modules(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    args = ["profile", "--url", "http://testserver/chat", "--tool-calls-path", "$.tool_calls",
+            "--min-interval", "0"]
+    assert main(args, TestClient(lab.app)) == 2  # no authorization confirmed
+    assert main(args + ["--confirm-authorized"], TestClient(lab.app)) == 0
+    out = capsys.readouterr().out
+    assert "Application type: agent" in out and "tool_abuse" in out
+
+
+def test_cli_scan_with_auto_modules_uses_the_profile(tmp_path, monkeypatch, capsys) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    out = tmp_path / "r.json"
+    assert main(BASE + ["--modules", "auto", "--out", str(out)], TestClient(lab.app)) == 0
+    report = json.loads(out.read_text())
+    assert "tool_abuse" in report["modules"]
+    assert "Profile: agent" in capsys.readouterr().err
