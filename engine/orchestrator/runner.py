@@ -6,6 +6,7 @@ The full orchestrator (profiles, depth, concurrency) will call these functions.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor
 
 from engine.connector import ConnectorError, HttpConnector
 from engine.core.models import AppProfile, Confidence, Finding
@@ -79,13 +80,25 @@ def run_scan(
     modules: Iterable[AttackModule],
     repeats: int = 3,
     should_stop: StopCheck | None = None,
+    workers: int = 1,
 ) -> list[Finding]:
-    out: list[Finding] = []
-    for m in modules:
-        if should_stop and should_stop():
-            break
-        out.extend(run_module(connector, m, repeats=repeats, should_stop=should_stop))
-    return out
+    """Run the modules, one after the other or `workers` at a time. Findings always come back
+    in module order. The connector's rate limit is shared, so parallel modules never send
+    faster than `min_interval` allows."""
+    mods = list(modules)
+
+    def one(m: AttackModule) -> list[Finding]:
+        return run_module(connector, m, repeats=repeats, should_stop=should_stop)
+
+    if workers <= 1 or len(mods) <= 1:
+        out: list[Finding] = []
+        for m in mods:
+            if should_stop and should_stop():
+                break
+            out.extend(one(m))
+        return out
+    with ThreadPoolExecutor(max_workers=min(workers, len(mods))) as pool:
+        return [f for found in pool.map(one, mods) for f in found]
 
 
 def detection_metrics(findings: Iterable[Finding], expected_ids: Iterable[str]) -> dict[str, float]:

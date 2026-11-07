@@ -147,7 +147,8 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
           file=sys.stderr)
 
     start = time.monotonic()
-    findings = assess(run_scan(connector, modules, repeats=DEPTH_REPEATS[args.depth]))
+    findings = assess(run_scan(connector, modules, repeats=DEPTH_REPEATS[args.depth],
+                         workers=args.workers))
     report = build_report(
         cfg["url"], findings, module_names, args.depth,
         time.monotonic() - start, len(connector.history),
@@ -250,6 +251,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="distinctive fragment of the app's system prompt (repeatable); weak evidence only",
     )
     s.add_argument("--depth", choices=list(DEPTH_REPEATS), default="standard")
+    s.add_argument(
+        "--workers", type=int, default=1, choices=range(1, 9), metavar="N",
+        help="run up to N modules in parallel (1 to 8); --min-interval still applies globally. "
+        "Useful for hosted APIs; a single-GPU local model gains nothing from it",
+    )
     s.add_argument("--out", default="aegis-report.json")
     s.add_argument("--confirm-authorized", action="store_true",
                    help="confirm you own the target or have written authorization")

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -147,13 +148,21 @@ class HttpConnector:
         self.config = config
         self._client = client or httpx.Client(timeout=config.timeout)
         self._last_sent = 0.0
+        self._lock = threading.Lock()  # one rate limit and one audit trail for all threads
         self.history: list[dict[str, Any]] = []  # structured audit trail (ENF-05)
 
     def _throttle(self) -> None:
-        wait = self.config.min_interval - (time.monotonic() - self._last_sent)
-        if wait > 0:
-            time.sleep(wait)
-        self._last_sent = time.monotonic()
+        # Holding the lock while sleeping serialises request starts, so min_interval is a
+        # global limit even when several modules run in parallel.
+        with self._lock:
+            wait = self.config.min_interval - (time.monotonic() - self._last_sent)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_sent = time.monotonic()
+
+    def _record(self, record: dict[str, Any]) -> None:
+        with self._lock:
+            self.history.append(record)
 
     def send(self, prompt: str) -> TargetResponse:
         cfg = self.config
@@ -182,12 +191,12 @@ class HttpConnector:
                 )
         except httpx.HTTPError as e:
             record["error"] = str(e)
-            self.history.append(record)
+            self._record(record)
             log.warning("request failed: %s", e)
             raise ConnectorError(f"Request to {cfg.url} failed: {e}") from e
 
         record["status"] = r.status_code
-        self.history.append(record)
+        self._record(record)
         log.info("%s %s -> %s", cfg.method, cfg.url, r.status_code)
         if r.status_code >= 400:
             raise ConnectorError(f"Target returned HTTP {r.status_code}: {r.text[:200]}")

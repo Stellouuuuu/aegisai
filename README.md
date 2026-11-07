@@ -42,7 +42,8 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Labo vulnérable (vulnérable et corrigé) | fait |
 | Profiler (chatbot, agent, RAG) et annulation de scan | fait |
 | Connecteur compatible OpenAI et streaming | fait |
-| Orchestrateur concurrent, scénarios supplémentaires | à faire |
+| Exécution parallèle des modules (`--workers`) | fait |
+| Scénarios supplémentaires du catalogue | à faire |
 | RAG (v2), adversarial (v3), white-box et SARIF (v4) | à faire |
 
 **Validation sur un vrai LLM (Mistral via Ollama, 5 scans par mode) :** score moyen 62 sur la variante vulnérable contre 99,2 sur la variante durcie, avec un rappel de 4/5 à 5/5 selon le scénario (TS-02 détecté en "à vérifier" seulement, le modèle écrivant ses appels d'outil en texte) et aucun faux positif confirmé sur la variante durcie. Détails et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
@@ -88,6 +89,8 @@ aegis scan --preset openai --model mistral --url http://localhost:11434/v1/chat/
 ```
 
 Le préréglage fournit le corps de requête, les chemins de réponse et d'appels d'outils ; les appels d'outils au format OpenAI sont normalisés pour les modules, et le streaming (server-sent events) est reconstitué avant analyse.
+
+`--workers N` exécute jusqu'à N modules en parallèle (la limite `--min-interval` reste globale). Mesuré sur Mistral local, un seul GPU : 99 s en séquentiel contre 126 s avec 4 workers, car le GPU traite les requêtes une par une. L'option sert pour les API hébergées, pas pour un modèle local.
 
 Pour laisser AegisAI choisir les tests, `aegis profile --url ... --confirm-authorized` devine le type d'application (chatbot, agent, RAG) à partir de deux questions inoffensives, et `aegis scan --modules auto` lance directement les modules recommandés.
 
