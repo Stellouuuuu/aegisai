@@ -93,7 +93,7 @@ def test_full_flow_scan_findings_report_retest(api: TestClient, monkeypatch) -> 
     assert api.get(f"/findings/{fid}").json()["data"]["reproducible"] is True
 
     report = api.get(f"/assessments/{aid}/report").json()
-    assert len(report["findings"]) == 5 and report["security_score"] == a["security_score"]
+    assert len(report["findings"]) == len(lab.KNOWN_VULNS) and report["security_score"] == a["security_score"]
     pdf = api.get(f"/assessments/{aid}/report.pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
 
@@ -107,7 +107,7 @@ def test_full_flow_scan_findings_report_retest(api: TestClient, monkeypatch) -> 
     after = api.get(f"/assessments/{aid}").json()
     assert after["security_score"] == 100
     final = api.get(f"/assessments/{aid}/report").json()
-    assert final["findings"] == [] and len(final["resolved_findings"]) == 5
+    assert final["findings"] == [] and len(final["resolved_findings"]) == len(lab.KNOWN_VULNS)
 
     assert [h["id"] for h in api.get(f"/projects/{pid}/assessments").json()] == [aid]
 
