@@ -53,6 +53,8 @@ def target_config(cfg: dict[str, Any]) -> TargetConfig:
         tool_calls_path=cfg.get("tool_calls_path"),
         auth=AuthConfig(**cfg.get("auth", {})),
         min_interval=float(cfg.get("min_interval", 0.2)),
+        timeout=float(cfg.get("timeout", 30)),
+        stream=bool(cfg.get("stream", False)),
     )
 
 

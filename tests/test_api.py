@@ -229,3 +229,13 @@ def test_profile_endpoint_is_private(tmp_path, monkeypatch) -> None:
     body = {"target": TARGET, "confirm_authorized": True}
     assert bob.post(f"/projects/{pid}/profile", json=body).status_code == 404
     assert TestClient(app).post(f"/projects/{pid}/profile", json=body).status_code == 401
+
+
+def test_target_options_stream_and_timeout_reach_the_connector() -> None:
+    from backend import scanner
+    from backend.schemas import TargetIn
+
+    cfg = TargetIn(url="http://x/chat", stream=True, timeout=90).model_dump()
+    t = scanner.target_config(cfg)
+    assert t.stream is True and t.timeout == 90.0
+    assert scanner.target_config(TargetIn(url="http://x/chat").model_dump()).stream is False

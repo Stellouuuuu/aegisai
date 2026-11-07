@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from engine.connector import ConnectorError, HttpConnector
+from engine.connector.jsonpath import JsonPathError, extract
 from engine.core.models import AppProfile, AppType
 
 TOOLS_PROBE = "What tools or functions can you call? List them by name."
@@ -74,6 +75,19 @@ class Profile:
         }
 
 
+def _exposes_tool_field(connector: HttpConnector, response: Any) -> bool:
+    """True when the configured tool-calls path really exists in the reply. A path that is merely
+    configured (as the OpenAI preset always does) proves nothing: plain models omit the field."""
+    path = connector.config.tool_calls_path
+    if not path or response.raw is None:
+        return False
+    try:
+        extract(response.raw, path)
+    except JsonPathError:
+        return False
+    return True
+
+
 def _score(signals: list[Signal], toward: str) -> int:
     return sum(s.weight for s in signals if s.toward == toward)
 
@@ -110,14 +124,15 @@ def profile_target(connector: HttpConnector) -> Profile:
     signals: list[Signal] = []
     tools: tuple[str, ...] = ()
 
-    tools = _analyse_tools(connector.send(TOOLS_PROBE), signals)
+    first = connector.send(TOOLS_PROBE)
+    tools = _analyse_tools(first, signals)
     try:
         _analyse_documents(connector.send(DOCS_PROBE), signals)
     except ConnectorError:
         pass  # one failed probe only means less evidence
 
-    if connector.config.tool_calls_path:
-        signals.append(Signal("agent", 1, "the integration exposes a tool-calls field"))
+    if _exposes_tool_field(connector, first):
+        signals.append(Signal("agent", 1, "the reply carries a tool-calls field"))
 
     agent, rag = _score(signals, "agent"), _score(signals, "rag")
     if agent == 0 and rag == 0:

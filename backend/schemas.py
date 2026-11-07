@@ -61,6 +61,8 @@ class TargetIn(BaseModel):
     tool_calls_path: str | None = None
     auth: AuthIn = AuthIn()
     min_interval: float = Field(default=0.2, ge=0, le=60)
+    timeout: float = Field(default=30, gt=0, le=300)
+    stream: bool = False
 
 
 class ProfileIn(BaseModel):

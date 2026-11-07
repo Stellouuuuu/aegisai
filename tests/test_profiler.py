@@ -68,10 +68,18 @@ def test_agent_wins_over_rag_when_both_present() -> None:
     assert p.app_type is AppType.AGENT and "tool_abuse" in p.modules
 
 
-def test_exposed_tool_calls_field_is_a_weak_hint() -> None:
-    p = profile_target(Fake(["Hello.", "Hello."], tool_calls_path="$.tool_calls"))
+def test_tool_calls_field_present_in_the_reply_is_a_weak_hint() -> None:
+    first = TargetResponse("Hello.", 200, raw={"reply": "Hello.", "tool_calls": []})
+    p = profile_target(Fake([first, "Hello."], tool_calls_path="$.tool_calls"))
     assert p.app_type is AppType.AGENT and p.confidence == "low"
     assert "tool_abuse" in p.modules
+
+
+def test_configured_but_absent_tool_calls_field_proves_nothing() -> None:
+    # OpenAI style servers omit the field when the model calls no tool.
+    first = TargetResponse("Hello.", 200, raw={"choices": [{"message": {"content": "Hello."}}]})
+    p = profile_target(Fake([first, "Hello."], tool_calls_path="$.choices[0].message.tool_calls"))
+    assert p.app_type is AppType.CHATBOT and p.signals == []
 
 
 def test_failed_second_probe_only_reduces_evidence() -> None:

@@ -66,6 +66,9 @@ class TargetConfig:
     auth: AuthConfig = field(default_factory=AuthConfig)
     timeout: float = 30.0
     min_interval: float = 0.0  # seconds between requests (rate limiting, ENF-03)
+    # Server-sent events (OpenAI style "stream": true). The stream is reassembled into the
+    # ordinary non-streaming shape, so response_path stays the same.
+    stream: bool = False
 
 
 @dataclass(frozen=True)
@@ -74,6 +77,49 @@ class TargetResponse:
     status_code: int
     tool_calls: list[Any] = field(default_factory=list)
     raw: Any = None
+
+
+def normalize_tool_call(call: Any) -> Any:
+    """OpenAI style {"function": {"name", "arguments"}} -> {"name", "arguments"}: one shape for
+    every module. Anything else is returned unchanged."""
+    if isinstance(call, dict) and isinstance(call.get("function"), dict):
+        fn = call["function"]
+        out = {"name": fn.get("name", ""), "arguments": fn.get("arguments", "")}
+        if "id" in call:
+            out["id"] = call["id"]
+        return out
+    return call
+
+
+def assemble_sse(lines: Any) -> dict[str, Any]:
+    """Rebuild a chat-completion response from OpenAI style SSE lines ("data: {json}")."""
+    text: list[str] = []
+    calls: dict[int, dict[str, Any]] = {}
+    for line in lines:
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if payload == "[DONE]":
+            break
+        try:
+            choice = json.loads(payload)["choices"][0]
+        except (ValueError, KeyError, IndexError, TypeError):
+            continue
+        delta = choice.get("delta") or {}
+        if delta.get("content"):
+            text.append(delta["content"])
+        for tc in delta.get("tool_calls") or []:
+            slot = calls.setdefault(tc.get("index", 0), {"function": {"name": "", "arguments": ""}})
+            fn = tc.get("function") or {}
+            slot["function"]["name"] += fn.get("name") or ""
+            slot["function"]["arguments"] += fn.get("arguments") or ""
+            if tc.get("id"):
+                slot["id"] = tc["id"]
+    message: dict[str, Any] = {"role": "assistant", "content": "".join(text)}
+    if calls:
+        message["tool_calls"] = [calls[i] for i in sorted(calls)]
+    return {"choices": [{"message": message}]}
 
 
 def render_template(template: Any, prompt: str) -> Any:
@@ -120,10 +166,20 @@ class HttpConnector:
             "method": cfg.method,
             "prompt": prompt,
         }
+        stream_data: dict[str, Any] | None = None
         try:
-            r = self._client.request(
-                cfg.method, cfg.url, json=body, headers=headers, timeout=cfg.timeout
-            )
+            if cfg.stream:
+                with self._client.stream(
+                    cfg.method, cfg.url, json=body, headers=headers, timeout=cfg.timeout
+                ) as r:
+                    if r.status_code < 400:
+                        stream_data = assemble_sse(r.iter_lines())
+                    else:
+                        r.read()
+            else:
+                r = self._client.request(
+                    cfg.method, cfg.url, json=body, headers=headers, timeout=cfg.timeout
+                )
         except httpx.HTTPError as e:
             record["error"] = str(e)
             self.history.append(record)
@@ -136,7 +192,7 @@ class HttpConnector:
         if r.status_code >= 400:
             raise ConnectorError(f"Target returned HTTP {r.status_code}: {r.text[:200]}")
         try:
-            data = r.json()
+            data = stream_data if stream_data is not None else r.json()
         except ValueError:
             kind = r.headers.get("content-type", "unknown type")
             snippet = " ".join(r.text[:80].split())
@@ -158,9 +214,12 @@ class HttpConnector:
         if cfg.tool_calls_path:
             try:
                 found = extract(data, cfg.tool_calls_path)
-                tool_calls = found if isinstance(found, list) else [found]
+                tool_calls = [normalize_tool_call(c) for c in
+                              (found if isinstance(found, list) else [found])]
             except JsonPathError:
                 pass
+        if text is None:  # a reply made only of tool calls has "content": null
+            text = ""
         return TargetResponse(
             text=text if isinstance(text, str) else json.dumps(text),
             status_code=r.status_code,

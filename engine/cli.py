@@ -13,6 +13,7 @@ import httpx
 
 from engine.attacks.registry import MODULES, build_modules
 from engine.connector import AuthConfig, ConnectorError, HttpConnector, TargetConfig
+from engine.connector.presets import OPENAI_URL, openai_config
 from engine.demo import DemoUnavailableError, start_demo_lab
 from engine.orchestrator import run_scan
 from engine.profiler import profile_target
@@ -46,6 +47,7 @@ def _target_from(cfg: dict[str, Any]) -> TargetConfig:
         auth=auth,
         timeout=float(cfg.get("timeout", 30)),
         min_interval=float(cfg.get("min_interval", 0.2)),
+        stream=bool(cfg.get("stream", False)),
     )
 
 
@@ -63,6 +65,13 @@ def _module_options(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, 
 
 def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
     cfg: dict[str, Any] = load_config(args.config) if args.config else {}
+    if args.preset == "openai":
+        if not args.model:
+            raise KeyError("--preset openai needs --model")
+        cfg.update(openai_config(
+            model=args.model, url=args.url or OPENAI_URL,
+            system_prompt=args.system_prompt, stream=args.stream,
+        ))
     if args.url:
         cfg["url"] = args.url
     if args.request_template:
@@ -71,6 +80,8 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         cfg["response_path"] = args.response_path
     if args.tool_calls_path:
         cfg["tool_calls_path"] = args.tool_calls_path
+    if args.no_auth:
+        cfg["auth"] = {"type": "none"}
     if args.auth_bearer:
         cfg["auth"] = {"type": "bearer", "token": args.auth_bearer}
     if args.min_interval is not None:
@@ -103,7 +114,11 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
         print("Refusing to scan: pass --confirm-authorized to confirm you are "
               "allowed to test this target.", file=sys.stderr)
         return 2
-    cfg = _config_from_args(args)
+    try:
+        cfg = _config_from_args(args)
+    except KeyError as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
+        return 2
     if "url" not in cfg:
         print("Missing target: use --url or a --config file with 'url'.", file=sys.stderr)
         return 2
@@ -149,7 +164,11 @@ def cmd_profile(args: argparse.Namespace, client: httpx.Client | None) -> int:
         print("Refusing to probe: pass --confirm-authorized to confirm you are "
               "allowed to test this target.", file=sys.stderr)
         return 2
-    cfg = _config_from_args(args)
+    try:
+        cfg = _config_from_args(args)
+    except KeyError as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
+        return 2
     if "url" not in cfg:
         print("Missing target: use --url or a --config file with 'url'.", file=sys.stderr)
         return 2
@@ -188,23 +207,38 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _add_target_args(p: argparse.ArgumentParser) -> None:
+    """Options that describe how to reach the target, shared by `scan` and `profile`."""
+    p.add_argument("--config", help="JSON or YAML target configuration")
+    p.add_argument("--url")
+    p.add_argument(
+        "--request-template",
+        help='JSON body with {{PROMPT}}, e.g. \'{"message": "{{PROMPT}}"}\'',
+    )
+    p.add_argument("--response-path", help="JSONPath of the reply, e.g. $.reply")
+    p.add_argument("--tool-calls-path", help="JSONPath of reported tool calls")
+    p.add_argument("--auth-bearer", help="Bearer token, or ${ENV_VAR}")
+    p.add_argument("--no-auth", action="store_true", help="send no credentials (local servers)")
+    p.add_argument(
+        "--preset", choices=["openai"],
+        help="ready-made config for OpenAI compatible /chat/completions APIs",
+    )
+    p.add_argument("--model", help="model name, for --preset openai")
+    p.add_argument("--system-prompt", help="system prompt to send, for --preset openai")
+    p.add_argument("--stream", action="store_true", help="use server-sent events (stream: true)")
+    p.add_argument("--min-interval", type=float, help="seconds between requests")
+    p.add_argument("--timeout", type=float, help="seconds to wait for each reply (slow models)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="aegis", description="AI application security scanner")
     sub = p.add_subparsers(dest="command", required=True)
 
     s = sub.add_parser("scan", help="scan a target application")
-    s.add_argument("--config", help="JSON or YAML target configuration")
-    s.add_argument("--url")
+    _add_target_args(s)
     s.add_argument(
         "--target", help="built-in demo lab: demo:vulnerable-chatbot or demo:patched-chatbot"
     )
-    s.add_argument(
-        "--request-template",
-        help='JSON body with {{PROMPT}}, e.g. \'{"message": "{{PROMPT}}"}\'',
-    )
-    s.add_argument("--response-path", help="JSONPath of the reply, e.g. $.reply")
-    s.add_argument("--tool-calls-path", help="JSONPath of reported tool calls")
-    s.add_argument("--auth-bearer", help="Bearer token, or ${ENV_VAR}")
     s.add_argument(
         "--modules", help=f"comma separated: {','.join(MODULES)}, or 'auto' to profile the target"
     )
@@ -216,22 +250,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="distinctive fragment of the app's system prompt (repeatable); weak evidence only",
     )
     s.add_argument("--depth", choices=list(DEPTH_REPEATS), default="standard")
-    s.add_argument("--min-interval", type=float, help="seconds between requests")
-    s.add_argument("--timeout", type=float, help="seconds to wait for each reply (slow models)")
     s.add_argument("--out", default="aegis-report.json")
     s.add_argument("--confirm-authorized", action="store_true",
                    help="confirm you own the target or have written authorization")
     s.add_argument("--fail-on-findings", action="store_true", help="exit 1 if findings exist (CI)")
 
     pr = sub.add_parser("profile", help="guess the application type (chatbot, agent, RAG)")
-    pr.add_argument("--config", help="JSON or YAML target configuration")
-    pr.add_argument("--url")
-    pr.add_argument("--request-template", help="JSON body with {{PROMPT}}")
-    pr.add_argument("--response-path", help="JSONPath of the reply, e.g. $.reply")
-    pr.add_argument("--tool-calls-path", help="JSONPath of reported tool calls")
-    pr.add_argument("--auth-bearer", help="Bearer token, or ${ENV_VAR}")
-    pr.add_argument("--min-interval", type=float, help="seconds between requests")
-    pr.add_argument("--timeout", type=float, help="seconds to wait for each reply")
+    _add_target_args(pr)
     pr.add_argument("--confirm-authorized", action="store_true",
                     help="confirm you own the target or have written authorization")
 
