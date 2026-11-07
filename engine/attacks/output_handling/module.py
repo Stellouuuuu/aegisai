@@ -97,6 +97,8 @@ class OutputSecurityModule(ScenarioModule):
             if "json" not in payload.text.lower():
                 return Verdict(False)  # only judge prompts that demand JSON (not the baseline)
             body = response.text.strip()
+            if not body and response.tool_calls:
+                return Verdict(False)  # the model chose a tool call: no text to hold to a format
             body = re.sub(r"^```(?:json)?\s*|\s*```$", "", body)  # a fenced block is accepted
             try:
                 ok = isinstance(json.loads(body), dict)

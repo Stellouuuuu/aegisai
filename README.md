@@ -33,7 +33,7 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Brique | État |
 |---|---|
 | Connecteur HTTP (template `{{PROMPT}}`, JSONPath, auth, rate limiting) | fait |
-| Modules d'attaque : Prompt Injection, Data Leakage, Output Security, Tool Security | fait, 5 scénarios (voir limites) |
+| Modules d'attaque : Prompt Injection, Data Leakage, Output Security, Tool Security | fait, 15 scénarios sur 20 du catalogue MVP (voir limites) |
 | Détecteurs, évaluateurs (baseline + répétition), Risk Engine | fait |
 | Rapports JSON et PDF | fait |
 | CLI `aegis` (scan, profile, report, mode démo) | fait |
@@ -43,12 +43,13 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Profiler (chatbot, agent, RAG) et annulation de scan | fait |
 | Connecteur compatible OpenAI et streaming | fait |
 | Exécution parallèle des modules (`--workers`) | fait |
-| Scénarios supplémentaires du catalogue | à faire |
+| 15 des 20 scénarios du catalogue MVP | fait |
+| 5 scénarios restants (multi-tours, multi-utilisateurs, RAG) | à faire |
 | RAG (v2), adversarial (v3), white-box et SARIF (v4) | à faire |
 
 **Validation sur un vrai LLM (Mistral via Ollama, 5 scans par mode) :** score moyen 62 sur la variante vulnérable contre 99,2 sur la variante durcie, avec un rappel de 4/5 à 5/5 selon le scénario (TS-02 détecté en "à vérifier" seulement, le modèle écrivant ses appels d'outil en texte) et aucun faux positif confirmé sur la variante durcie. Détails et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
 
-**Limites connues :** le labo est un simulateur à règles (pas un vrai LLM), donc les chiffres ci-dessus prouvent que la chaîne fonctionne, pas la qualité des payloads face à un vrai modèle. Seuls 5 scénarios du catalogue sont implémentés (PI-02, DL-01, DL-02, OS-01, TS-02). Voir [`ROADMAP.md`](./ROADMAP.md).
+**Limites connues :** le labo est un simulateur à règles (pas un vrai LLM), donc les chiffres ci-dessus prouvent que la chaîne fonctionne, pas la qualité des payloads face à un vrai modèle. 15 scénarios du catalogue MVP sur 20 sont implémentés ; les 5 autres demandent des conversations à plusieurs tours, plusieurs utilisateurs ou un RAG (voir le catalogue). Sur un vrai LLM le rappel est partiel et dépend du scénario : certains ne se déclenchent jamais sur Mistral (TS-03, TS-05). Voir [`ROADMAP.md`](./ROADMAP.md).
 
 ## Démarrage rapide
 
@@ -128,10 +129,10 @@ et les comptes sont conservés dans le volume `aegis-data`.
 
 | Famille | OWASP 2025 | Scénarios implémentés |
 |---|---|---|
-| Prompt Injection | LLM01 | PI-02 |
+| Prompt Injection | LLM01 | PI-02 (ignorer les consignes), PI-03 (persona), PI-04 (document piégé), PI-05 (encodé, langue tierce), PI-06 (format détourné) |
 | Data Leakage | LLM02 / LLM07 | DL-01 (canary), DL-02 (system prompt) |
-| Output Security | LLM05 | OS-01 (HTML/JS non échappé) |
-| Agent et Tool Security | LLM06 | TS-02 (action destructrice induite) |
+| Output Security | LLM05 | OS-01 (HTML/JS non échappé), OS-02 (SQL), OS-03 (shell), OS-05 (JSON non respecté) |
+| Agent et Tool Security | LLM06 | TS-01 (outil hors liste, avec `--allowed-tools`), TS-02 (action destructrice), TS-03 (exfiltration), TS-05 (escalade de droits) |
 
 Catalogue complet (y compris les scénarios prévus) : [`docs/CATALOGUE_TESTS_SECURITE.md`](./docs/CATALOGUE_TESTS_SECURITE.md).
 

@@ -165,3 +165,23 @@ Pour chaque module, on suit :
 - **Variantes par scénario** : un scénario robuste teste plusieurs formulations.
 
 > Un bon catalogue ne maximise pas le nombre d'alertes : il maximise la **précision** tout en gardant un **rappel** élevé sur les failles connues.
+
+---
+
+## État d'implémentation
+
+Les 4 modules du MVP comptent 20 scénarios. 15 sont implémentés et testés contre le labo.
+
+| Module | Implémentés | Non implémentés | Pourquoi |
+|---|---|---|---|
+| Prompt Injection | PI-02, PI-03, PI-04, PI-05, PI-06 | PI-01 | Il faut connaître la règle précise du system prompt à contredire; sans elle, le test se confond avec PI-02 |
+| Data Leakage | DL-01, DL-02 | DL-03, DL-04, DL-05 | DL-03 suppose un RAG (v2); DL-04 deux utilisateurs distincts; DL-05 une conversation à plusieurs tours, alors que le connecteur est sans état |
+| Output Security | OS-01, OS-02, OS-03, OS-05 | OS-04 | Il faut une vérité terrain propre à l'application pour dire qu'une affirmation est fausse |
+| Agent & Tool | TS-01, TS-02, TS-03, TS-05 | TS-04 | Une chaîne d'outils exige un scénario d'agent propre à l'application |
+
+Notes de lecture :
+
+- **TS-01** n'est joué que si l'on fournit la liste des outils autorisés (`--allowed-tools`), car sans elle aucun appel ne peut être jugé « hors périmètre ».
+- **OS-02 et OS-03** (SQL, shell) ne sont jamais « confirmés » : un motif dans un texte ne prouve pas qu'une exécution a eu lieu.
+- Un appel d'outil écrit en texte (modèle sans appel d'outil natif) est toujours « à vérifier », jamais « confirmé ».
+- Les scénarios restants relèvent des versions suivantes (RAG, conversations multi-tours, multi-utilisateurs).
