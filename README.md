@@ -41,7 +41,8 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Dashboard web (React) | fait |
 | Labo vulnérable (vulnérable et corrigé) | fait |
 | Profiler (chatbot, agent, RAG) et annulation de scan | fait |
-| Orchestrateur concurrent, scénarios supplémentaires, connecteur OpenAI | à faire |
+| Connecteur compatible OpenAI et streaming | fait |
+| Orchestrateur concurrent, scénarios supplémentaires | à faire |
 | RAG (v2), adversarial (v3), white-box et SARIF (v4) | à faire |
 
 **Validation sur un vrai LLM (Mistral via Ollama, 5 scans par mode) :** score moyen 62 sur la variante vulnérable contre 99,2 sur la variante durcie, avec un rappel de 4/5 à 5/5 selon le scénario (TS-02 détecté en "à vérifier" seulement, le modèle écrivant ses appels d'outil en texte) et aucun faux positif confirmé sur la variante durcie. Détails et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
@@ -74,6 +75,19 @@ aegis scan --url https://mon-app.com/api/chat \
            --auth-bearer '${MON_TOKEN}' \
            --confirm-authorized --depth standard
 ```
+
+Pour une API compatible OpenAI (OpenAI, vLLM, LiteLLM, Ollama) :
+
+```bash
+export OPENAI_API_KEY=...
+aegis scan --preset openai --model gpt-4o-mini --system-prompt "Tu es l'assistant de ma boutique" \
+           --confirm-authorized
+# serveur local sans clef, avec streaming :
+aegis scan --preset openai --model mistral --url http://localhost:11434/v1/chat/completions \
+           --no-auth --stream --confirm-authorized
+```
+
+Le préréglage fournit le corps de requête, les chemins de réponse et d'appels d'outils ; les appels d'outils au format OpenAI sont normalisés pour les modules, et le streaming (server-sent events) est reconstitué avant analyse.
 
 Pour laisser AegisAI choisir les tests, `aegis profile --url ... --confirm-authorized` devine le type d'application (chatbot, agent, RAG) à partir de deux questions inoffensives, et `aegis scan --modules auto` lance directement les modules recommandés.
 
