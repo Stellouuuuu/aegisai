@@ -1,5 +1,5 @@
 export type Severity = "critical" | "high" | "medium" | "low";
-export type AssessmentStatus = "pending" | "running" | "completed" | "failed";
+export type AssessmentStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export interface Project {
   id: number;

@@ -111,6 +111,7 @@ export function statusTone(s: AssessmentStatus): "run" | "ok" | "bad" | "idle" {
   if (s === "running") return "run";
   if (s === "completed") return "ok";
   if (s === "failed") return "bad";
+  if (s === "cancelled") return "idle";
   return "idle";
 }
 

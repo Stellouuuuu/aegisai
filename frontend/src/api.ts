@@ -96,6 +96,7 @@ export const api = {
   startScan: (projectId: number, body: NewScanBody) =>
     post<Assessment>(`/projects/${projectId}/assessments`, body),
   assessment: (id: number) => json<Assessment>(`/assessments/${id}`),
+  cancel: (id: number) => post<Assessment>(`/assessments/${id}/cancel`),
   findings: (id: number) => json<FindingRow[]>(`/assessments/${id}/findings`),
   retest: (findingId: number) =>
     post<{ finding_id: number; status: string }>(`/findings/${findingId}/retest`),

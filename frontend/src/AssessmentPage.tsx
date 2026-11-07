@@ -57,6 +57,19 @@ export function AssessmentPage({ id }: { id: number }) {
     }
   }
 
+  async function cancelScan() {
+    setBusy("cancel");
+    setActionError(null);
+    try {
+      await api.cancel(id);
+    } catch (e) {
+      setActionError((e as Error).message);
+    } finally {
+      setBusy(null);
+      a.reload();
+    }
+  }
+
   async function retestAll() {
     setBusy("retest");
     setActionError(null);
@@ -113,11 +126,21 @@ export function AssessmentPage({ id }: { id: number }) {
         </>
       )}
 
+      {assessment.status === "cancelled" && (
+        <p className="muted">
+          This scan was cancelled before it finished, so it has no score or report.{" "}
+          <a href={`#/projects/${assessment.project_id}/new`}>Start a new scan</a>.
+        </p>
+      )}
+
       {(assessment.status === "pending" || assessment.status === "running") && (
         <section className="card lanes">
           <div className="lanes-head">
             <h2>Attack lanes</h2>
             <span className="muted">{assessment.progress}% complete</span>
+            <button className="btn btn-ghost" disabled={!!busy} onClick={cancelScan}>
+              {busy === "cancel" ? "Cancelling..." : "Cancel scan"}
+            </button>
           </div>
           <div className="bar">
             <span style={{ width: `${assessment.progress}%` }} />

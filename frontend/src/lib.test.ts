@@ -4,6 +4,7 @@ import {
   grade,
   highlight,
   laneState,
+  statusTone,
   parseApiError,
   sortFindings,
 } from "./lib";
@@ -63,6 +64,14 @@ describe("parseApiError", () => {
     );
     expect(msg).toBe("target.url: bad");
     expect(parseApiError(null, "fallback")).toBe("fallback");
+  });
+});
+
+describe("statusTone", () => {
+  it("treats a cancelled scan as neutral, not as a failure", () => {
+    expect(statusTone("cancelled")).toBe("idle");
+    expect(statusTone("failed")).toBe("bad");
+    expect(statusTone("completed")).toBe("ok");
   });
 });
 
