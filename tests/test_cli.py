@@ -22,7 +22,7 @@ def test_cli_scan_vulnerable_lab(tmp_path, monkeypatch, capsys) -> None:
     assert code == 1
     report = json.loads(out.read_text())
     assert {f["id"] for f in report["findings"]} == set(lab.KNOWN_VULNS)
-    assert report["security_score"] < 100 and report["summary"]["critical"] == 2
+    assert report["security_score"] < 100 and report["summary"]["critical"] == 3
     assert all(f["risk_score"] is not None for f in report["findings"])
     assert "Security score" in capsys.readouterr().out
     assert main(["report", str(out)]) == 0

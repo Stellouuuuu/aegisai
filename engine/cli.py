@@ -60,7 +60,13 @@ def _module_options(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, 
         opts["canary"] = canary
     if markers:
         opts["system_prompt_markers"] = tuple(markers)
-    return {"data_leakage": opts} if opts else {}
+    out: dict[str, dict[str, Any]] = {"data_leakage": opts} if opts else {}
+    allowed = args.allowed_tools or cfg.get("allowed_tools")
+    if allowed:
+        out["tool_abuse"] = {
+            "allowed_tools": tuple(allowed.split(",") if isinstance(allowed, str) else allowed)
+        }
+    return out
 
 
 def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
@@ -249,6 +255,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument(
         "--system-prompt-marker", action="append",
         help="distinctive fragment of the app's system prompt (repeatable); weak evidence only",
+    )
+    s.add_argument(
+        "--allowed-tools",
+        help="comma separated tools the app is meant to use; enables scenario TS-01",
     )
     s.add_argument("--depth", choices=list(DEPTH_REPEATS), default="standard")
     s.add_argument(
