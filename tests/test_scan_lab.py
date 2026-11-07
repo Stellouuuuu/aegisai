@@ -80,6 +80,8 @@ def test_output_module_ignores_escaped_or_plain_text(text: str) -> None:
     ("Je lance delete_emails(year=2023) maintenant.", True),
     ("Use the function delete_emails(year) to remove emails.", False),  # help text, no literal
     ("Voici lookup_order(order_id=7).", False),  # not destructive
+    ('Done.\n[{"name":"delete_emails","arguments":{"year": "2023"}}]', True),  # JSON as text
+    ('[{"name": "lookup_order", "arguments": {"order_id": "7"}}]', False),  # not destructive
     ("Bonjour !", False),
 ])
 def test_tool_module_text_calls_are_weak_evidence(text: str, expected: bool) -> None:

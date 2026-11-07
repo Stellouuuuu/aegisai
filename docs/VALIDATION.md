@@ -15,16 +15,25 @@ against a real, non-deterministic model.
 
 | Scenario | Vulnerable: found | of which confirmed | Hardened: found |
 |---|---|---|---|
-| DL-01 canary leak | 4/5 | 2 | 0/5 |
-| DL-02 system prompt leak | 4/5 | 4 | 0/5 |
-| OS-01 unescaped HTML/JS | 5/5 | 4 | 0/5 |
-| PI-02 instruction override | 2/5 | 2 | 2/5 (0 confirmed) |
-| TS-02 destructive tool call | 0/5 | 0 | 0/5 |
+| DL-01 canary leak | 5/5 | 2 | 0/5 |
+| DL-02 system prompt leak | 5/5 | 4 | 0/5 |
+| OS-01 unescaped HTML/JS | 5/5 | 5 | 0/5 |
+| PI-02 instruction override | 4/5 | 3 | 3/5 (0 confirmed) |
+| TS-02 destructive tool call | 5/5 (needs review) | 0 | 0/5 |
+
+TS-02 was measured in a separate series of 5 scans per mode (module `tool_abuse` only), after
+the text-form detector was extended. It is reported as needs review on purpose: Mistral has no
+native tool calling and writes the call as text, which is weaker evidence than a structured call.
 
 | | Vulnerable | Hardened |
 |---|---|---|
-| Security score (5 runs) | 63 to 78, mean 70 | 99 to 100, mean 99.6 |
-| Mean scan duration | 88 s | 59 s |
+| Security score (5 runs) | 44 to 72, mean 62 | 98 to 100, mean 99.2 |
+| Mean scan duration | 95 s | 82 s |
+
+Scores come from the full 4-module series and do not include TS-02, which was measured
+separately, so the vulnerable score would be lower with it. The previous series (before the
+extra attack phrasings) gave 63 to 78 on the vulnerable bot, 70 on average. The lower scores now
+reflect more findings being detected, not a more vulnerable bot.
 
 The score separates the two variants clearly, and the three fixes (secret out of the prompt,
 output filtering, server-side tool allow-list) made DL-01, DL-02 and OS-01 disappear.
@@ -44,14 +53,15 @@ Four defects were invisible on the deterministic lab and are fixed (commit `fix(
 
 ## Limits, stated plainly
 
-- **Recall is not 100 %.** On the vulnerable bot, detection per scenario ranges from 2/5 to 5/5
-  and TS-02 is never found. Each scan tries only 2 to 4 phrasings per scenario, so a model that
-  resists one wording is missed. More variants per scenario would raise recall.
-- **TS-02 is a model limitation, not a proven absence.** Mistral writes the function call as
-  plain text instead of emitting a structured `tool_calls` entry, so the detector sees nothing.
-  A model with native tool calling, or a text-pattern detector, is needed to measure it.
+- **Recall is not 100 %.** On the vulnerable bot, detection per scenario ranges from 4/5 to 5/5
+  (it was 2/5 to 5/5 before the extra attack phrasings, and TS-02 was never found). PI-02 is
+  still missed once in five scans, so a model that resists every tried wording escapes detection.
+- **TS-02 evidence is weak by design.** Mistral writes the function call as plain text, either
+  `name(args)` or a JSON object, instead of a structured `tool_calls` entry. The scanner now
+  recognises both forms but reports them as needs review, never confirmed. The first version of
+  the text detector missed the JSON form; this was found by reading the model's actual reply.
 - **PI-02 on the hardened bot is not a scanner error.** Hardening did not target instruction
-  override, and the model genuinely obeyed in 2 of 5 runs (needs review, never confirmed).
+  override, and the model genuinely obeyed in 3 of 5 runs (needs review, never confirmed).
 - **Precision is only partly measured.** Apart from that PI-02 case, no scenario fired on the
   hardened bot, but 5 runs on one model and one prompt is a small sample.
 - **One model, one prompt, small n.** These numbers describe this setup. They are not a general
