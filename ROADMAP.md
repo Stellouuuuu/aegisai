@@ -35,8 +35,8 @@ Il vaut mieux 4 vulnérabilités **prouvées et reproductibles** que 20 alertes 
 
 ### Livrables techniques
 - [x] `Connector` HTTP générique (template configurable ; le mode compatible OpenAI reste à faire)
-- [ ] `Profiler` de base
-- [ ] `Orchestrator` avec rate limiting et profondeurs quick/standard/deep (runner séquentiel, rate limiting et profondeurs faits ; concurrence et annulation à faire)
+- [x] `Profiler` de base (chatbot, agent, RAG ; `aegis profile`, `--modules auto`, endpoint API, bouton du dashboard)
+- [ ] `Orchestrator` avec rate limiting et profondeurs quick/standard/deep (runner séquentiel, rate limiting, profondeurs et annulation faits ; concurrence à faire)
 - [x] 4 modules d'attaque (plugins) : 5 scénarios implémentés sur 25 du catalogue MVP
 - [x] `Detectors` (canary, marqueurs, appels d'outils)
 - [x] `Evaluators` (répétition, baseline, niveau de confiance)

@@ -36,11 +36,12 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Modules d'attaque : Prompt Injection, Data Leakage, Output Security, Tool Security | fait, 5 scénarios (voir limites) |
 | Détecteurs, évaluateurs (baseline + répétition), Risk Engine | fait |
 | Rapports JSON et PDF | fait |
-| CLI `aegis` (scan, report, mode démo) | fait |
+| CLI `aegis` (scan, profile, report, mode démo) | fait |
 | API REST (comptes, projets, scans, re-test, rapports) | fait |
 | Dashboard web (React) | fait |
 | Labo vulnérable (vulnérable et corrigé) | fait |
-| Profiler, orchestrateur complet (concurrence, annulation) | à faire |
+| Profiler (chatbot, agent, RAG) et annulation de scan | fait |
+| Orchestrateur concurrent, scénarios supplémentaires, connecteur OpenAI | à faire |
 | RAG (v2), adversarial (v3), white-box et SARIF (v4) | à faire |
 
 **Validation sur un vrai LLM (Mistral via Ollama, 5 scans par mode) :** score moyen 62 sur la variante vulnérable contre 99,2 sur la variante durcie, avec un rappel de 4/5 à 5/5 selon le scénario (TS-02 détecté en "à vérifier" seulement, le modèle écrivant ses appels d'outil en texte) et aucun faux positif confirmé sur la variante durcie. Détails et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
@@ -73,6 +74,8 @@ aegis scan --url https://mon-app.com/api/chat \
            --auth-bearer '${MON_TOKEN}' \
            --confirm-authorized --depth standard
 ```
+
+Pour laisser AegisAI choisir les tests, `aegis profile --url ... --confirm-authorized` devine le type d'application (chatbot, agent, RAG) à partir de deux questions inoffensives, et `aegis scan --modules auto` lance directement les modules recommandés.
 
 `--confirm-authorized` est obligatoire : il atteste que la cible est la vôtre ou que vous avez une autorisation écrite. `--fail-on-findings` fait échouer la commande (code 1) s'il y a des failles, utile en CI.
 
