@@ -44,8 +44,13 @@ def run_adaptive(
     attacker: LlmAttacker | None = None,
     should_stop: Callable[[], bool] | None = None,
     attempts: list[Attempt] | None = None,
+    control: bool = False,
 ) -> list[Finding]:
-    """Findings for scenarios of `module` that the normal scan did not prove."""
+    """Findings for scenarios of `module` that the normal scan did not prove.
+
+    With `control`, nothing is rewritten: the original prompts are simply sent again, the same
+    number of times. It measures how much of the adaptive pass is mere extra tries.
+    """
     stop = should_stop or (lambda: False)
     if rounds <= 0 or stop():
         return []
@@ -66,8 +71,8 @@ def run_adaptive(
                 return out
             base = payloads[(n - 1) % len(payloads)]
             names = next_strategies(last_reply, tried)
-            use_llm = attacker is not None and (is_refusal(last_reply) or not names)
-            text, label = base.text, ""
+            use_llm = not control and attacker is not None and (is_refusal(last_reply) or not names)
+            text, label = base.text, "repeat" if control else ""
             if use_llm and attacker is not None:
                 rewritten = attacker.rewrite(base.text, last_reply)
                 if rewritten:
@@ -117,12 +122,14 @@ def adapt_scan(
     repeats: int = 3,
     attacker: LlmAttacker | None = None,
     should_stop: Callable[[], bool] | None = None,
+    control: bool = False,
 ) -> list[Finding]:
     """Second pass over a finished scan: only the scenarios that found nothing are retried."""
     extra: list[Finding] = []
     for module in modules:
         found = {f.id for f in findings if f.category == module.id}
         extra += run_adaptive(
-            connector, module, found, rounds, repeats, attacker=attacker, should_stop=should_stop
+            connector, module, found, rounds, repeats, attacker=attacker, should_stop=should_stop,
+            control=control,
         )
     return extra

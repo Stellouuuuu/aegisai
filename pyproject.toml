@@ -30,6 +30,7 @@ pythonpath = [".", "vulnerable-lab"]
 [tool.ruff]
 line-length = 100
 src = [".", "vulnerable-lab"]
+extend-exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

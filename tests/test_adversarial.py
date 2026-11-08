@@ -136,3 +136,17 @@ def test_api_runs_the_adaptive_pass(tmp_path, monkeypatch: pytest.MonkeyPatch) -
     assert scan(8) > scan(0)
     too_many = {"target": target, "adversarial_rounds": 99, "confirm_authorized": True}
     assert api.post(f"/projects/{pid}/assessments", json=too_many).status_code == 422
+
+
+def test_control_resends_the_original_prompt_without_rewriting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "filtered")
+    module = PromptInjectionModule()
+    plain = {f.id for f in run_module(connector(), module)}
+    attempts: list[Attempt] = []
+    extra = run_adaptive(connector(), module, plain, rounds=8, attempts=attempts, control=True)
+    assert attempts and all(a.strategy == "repeat" for a in attempts)
+    assert extra == []  # the filter blocks the fixed prompts however often they are sent
+    adaptive = run_adaptive(connector(), module, plain, rounds=8)
+    assert adaptive  # the rewrites do get through: that gap is what the control measures

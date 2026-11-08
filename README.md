@@ -91,7 +91,8 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | 15 des 20 scénarios du catalogue MVP | fait |
 | Module RAG (v2, premier jalon : document piégé, secret extrait, isolation des documents) | fait |
 | Attaques adaptatives (v3 : `--adversarial`, réécritures guidées par les réponses, attaquant LLM optionnel) | fait, mesuré sur Mistral |
-| White-box (analyse du code) et export SARIF (v4) | à faire |
+| Export SARIF et revue statique du code (6 règles, heuristiques, v4 minimal) | fait |
+| Analyse de flux de données (white-box complet) | à faire |
 
 **Validation sur un vrai LLM (Mistral via Ollama, scan complet des 15 scénarios, 5 scans par mode) :** score de 14 à 45 (moyenne 24,8) sur la variante vulnérable contre 73 à 85 (moyenne 78,8) sur la variante durcie. Les failles ciblées par le durcissement (fuite de canary et de system prompt, HTML non échappé, outils) disparaissent ; les scénarios que le durcissement ne vise pas (persona, injection) restent détectés, car le modèle y obéit réellement. Détails, rappel par scénario et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
 
@@ -139,7 +140,7 @@ Le préréglage fournit le corps de requête, les chemins de réponse et d'appel
 
 `--workers N` exécute jusqu'à N modules en parallèle (la limite `--min-interval` reste globale). Mesuré sur Mistral local, un seul GPU : 99 s en séquentiel contre 126 s avec 4 workers, car le GPU traite les requêtes une par une. L'option sert pour les API hébergées, pas pour un modèle local.
 
-Pour retenter les scénarios qui ont résisté, `--adversarial 4` réessaie chacun avec jusqu'à 4 prompts réécrits (jeu de rôle, faux délimiteurs, encodage, exemples guidés...), choisis selon la dernière réponse de l'application. `--attacker-model mistral` ajoute un modèle qui reformule après un refus (API compatible OpenAI, Ollama local par défaut). Le finding indique la réécriture qui a fonctionné (`extra.adversarial`). Dans l'API, le champ est `adversarial_rounds`.
+Pour retenter les scénarios qui ont résisté, `--adversarial 4` réessaie chacun avec jusqu'à 4 prompts réécrits (jeu de rôle, faux délimiteurs, encodage, exemples guidés...), choisis selon la dernière réponse de l'application. `--adversarial-control` rejoue à la place les prompts d'origine, sans réécriture, autant de fois : c'est le témoin qui mesure ce que la passe apporte au-delà de simples essais en plus. `--attacker-model mistral` ajoute un modèle qui reformule après un refus (API compatible OpenAI, Ollama local par défaut). Le finding indique la réécriture qui a fonctionné (`extra.adversarial`). Dans l'API, le champ est `adversarial_rounds`.
 
 Pour laisser AegisAI choisir les tests, `aegis profile --url ... --confirm-authorized` devine le type d'application (chatbot, agent, RAG) à partir de deux questions inoffensives, et `aegis scan --modules auto` lance directement les modules recommandés.
 
@@ -250,6 +251,25 @@ Dans l'API, le champ `second_auth` prend le même format que `auth` (référence
 ### Un cas réel : l'audit de Mnemo
 
 AegisAI a servi à auditer un assistant local construit à côté, Mnemo (chat, mémoire, RAG). Premier scan : 45 sur 100, avec des injections de prompt confirmées et un fragment du prompt système restitué ; après deux correctifs (règles du prompt et garde côté serveur contre la fuite des instructions), 74 puis 81 sur 100. Le rapport trie aussi ce qui n'a pas été corrigé et pourquoi : [`audit-v0.4.md`](https://github.com/Stellouuuuu/mnemo/blob/main/docs/securite/audit-v0.4.md).
+
+### Export SARIF et revue du code source
+
+Les résultats d'un scan s'exportent au format SARIF 2.1.0, lu par GitHub code scanning et d'autres outils :
+
+```bash
+aegis scan ... --sarif aegis.sarif                       # directement depuis un scan
+aegis report aegis-report.json --format sarif --anchor README.md -o aegis.sarif
+```
+
+Une faille de type boîte noire n'a pas de fichier source : elle est rattachée à l'URL scannée, et `--anchor` donne à GitHub un fichier où l'afficher.
+
+`aegis audit-code <dossier>` fait en plus une **revue statique** du code d'une application LLM (boîte blanche, version minimale) : sortie du modèle passée à `eval` ou à un shell (AC-01), insérée en HTML sans échappement (AC-02) ou collée dans du SQL (AC-03), secret écrit en dur (AC-04), outil destructeur sans confirmation (AC-05), saisie utilisateur dans le message système (AC-06). Chaque résultat a son fichier et sa ligne, dans le JSON et dans le SARIF (`--sarif`).
+
+```bash
+aegis audit-code ./mon-app --sarif code.sarif            # 6 règles, fichiers de test ignorés
+```
+
+**Limites :** ce sont des heuristiques ligne par ligne, pas une analyse de flux de données. Les résultats sont donc toujours « à vérifier » (jamais « confirmés ») et peuvent être des faux positifs ; un code qui contourne les motifs passe. Une ligne contenant `aegis-ignore` est ignorée.
 
 ## Comment une faille est prouvée
 

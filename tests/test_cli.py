@@ -118,3 +118,30 @@ def test_second_auth_bearer_enables_the_cross_user_scenario(tmp_path, monkeypatc
     assert "DL-04" not in {f["id"] for f in json.loads(out.read_text())["findings"]}
     main(args + ["--second-auth-bearer", "${USER_B}"], TestClient(lab.app))
     assert "DL-04" in {f["id"] for f in json.loads(out.read_text())["findings"]}
+
+
+def test_scan_writes_sarif_and_report_converts_it(tmp_path, monkeypatch) -> None:
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from chatbot import app as lab
+    from engine.cli import main
+
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    report, sarif = tmp_path / "r.json", tmp_path / "r.sarif"
+    main(["scan", "--url", "http://testserver/chat", "--tool-calls-path", "$.tool_calls",
+          "--modules", "prompt_injection", "--min-interval", "0", "--confirm-authorized",
+          "--out", str(report), "--sarif", str(sarif)], TestClient(lab.app))
+    log = json.loads(sarif.read_text())
+    results = log["runs"][0]["results"]
+    ids = {f["id"] for f in json.loads(report.read_text())["findings"]}
+    assert {r["ruleId"] for r in results} == ids and ids
+    assert results[0]["locations"][0]["logicalLocations"][0]["name"] == "http://testserver/chat"
+    assert all(r["level"] in {"error", "warning", "note"} for r in results)
+
+    converted = tmp_path / "again.sarif"
+    assert main(["report", str(report), "--format", "sarif", "-o", str(converted),
+                 "--anchor", "docs/x.md"]) == 0
+    again = json.loads(converted.read_text())
+    assert again["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"] == "docs/x.md"

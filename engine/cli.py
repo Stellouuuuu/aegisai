@@ -196,7 +196,8 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
     if args.adversarial:
         attacker = _attacker(args, client)
         extra = adapt_scan(connector, modules, findings, args.adversarial,
-                           repeats=DEPTH_REPEATS[args.depth], attacker=attacker)
+                           repeats=DEPTH_REPEATS[args.depth], attacker=attacker,
+                           control=args.adversarial_control)
         print(f"Adaptive pass: {len(extra)} more finding(s) after rewriting resisted attacks.",
               file=sys.stderr)
         findings += extra
@@ -206,6 +207,10 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
         time.monotonic() - start, len(connector.history),
     )
     Path(args.out).write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    if args.sarif:
+        from engine.reporting.sarif import to_sarif
+
+        Path(args.sarif).write_text(json.dumps(to_sarif(report), indent=2), encoding="utf-8")
     print(render_summary(report))
     print(f"Report written to {args.out}")
     return 1 if args.fail_on_findings and findings else 0
@@ -256,8 +261,38 @@ def cmd_report(args: argparse.Namespace) -> int:
         render_pdf(report, out)
         print(f"PDF report written to {out}")
         return 0
+    if args.format == "sarif":
+        from engine.reporting.sarif import to_sarif
+
+        out = args.output or str(Path(args.file).with_suffix(".sarif"))
+        Path(out).write_text(json.dumps(to_sarif(report, args.anchor), indent=2), encoding="utf-8")
+        print(f"SARIF report written to {out}")
+        return 0
     print(render_summary(report))
     return 0
+
+
+def cmd_audit_code(args: argparse.Namespace) -> int:
+    from engine.whitebox.scanner import timed_audit
+
+    root = Path(args.path)
+    if not root.exists():
+        print(f"Path not found: {root}", file=sys.stderr)
+        return 2
+    report = timed_audit(root, include_tests=args.include_tests)
+    Path(args.out).write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    if args.sarif:
+        from engine.reporting.sarif import to_sarif
+
+        Path(args.sarif).write_text(json.dumps(to_sarif(report), indent=2), encoding="utf-8")
+    findings = report["findings"]
+    print(f"Static audit of {root}: {len(findings)} finding(s) to review")
+    for f in findings:
+        loc = f["location"]
+        print(f"  [{f['severity'].upper():8}] {f['id']} "
+              f"{loc['file']}:{loc['line']} {f['scenario']}")
+    print(f"Report written to {args.out}" + (f", SARIF to {args.sarif}" if args.sarif else ""))
+    return 1 if args.fail_on_findings and findings else 0
 
 
 def _add_target_args(p: argparse.ArgumentParser) -> None:
@@ -321,6 +356,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="after the scan, retry every scenario that found nothing with up to ROUNDS "
         "rewritten prompts (0 = off). The strategy that worked is recorded in the finding",
     )
+    s.add_argument("--adversarial-control", action="store_true",
+                   help="control run: the adaptive pass resends the original prompts unchanged, "
+                   "to measure how much of its gain is just extra tries")
     s.add_argument("--attacker-model", help="model of an OpenAI compatible API that rewrites "
                    "resisted prompts during the adaptive pass")
     s.add_argument("--attacker-url", help="its chat completions URL "
@@ -328,6 +366,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--attacker-token", default=None,
                    help="its API key as ${ENV_VAR} (omit for servers without a key)")
     s.add_argument("--out", default="aegis-report.json")
+    s.add_argument("--sarif", help="also write the findings as a SARIF file")
     s.add_argument("--confirm-authorized", action="store_true",
                    help="confirm you own the target or have written authorization")
     s.add_argument("--fail-on-findings", action="store_true", help="exit 1 if findings exist (CI)")
@@ -337,10 +376,19 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--confirm-authorized", action="store_true",
                     help="confirm you own the target or have written authorization")
 
+    c = sub.add_parser("audit-code", help="static review of an LLM application's source code")
+    c.add_argument("path", help="a source file or a project folder")
+    c.add_argument("--out", default="aegis-code-report.json")
+    c.add_argument("--sarif", help="also write a SARIF file (GitHub code scanning)")
+    c.add_argument("--include-tests", action="store_true", help="also scan test files")
+    c.add_argument("--fail-on-findings", action="store_true", help="exit 1 if anything is found")
+
     r = sub.add_parser("report", help="summarize a JSON report, or export it as PDF")
     r.add_argument("file")
-    r.add_argument("--format", choices=["text", "pdf"], default="text")
-    r.add_argument("-o", "--output", help="output path for --format pdf")
+    r.add_argument("--format", choices=["text", "pdf", "sarif"], default="text")
+    r.add_argument("--anchor", default="README.md",
+                   help="file that code scanning attaches a black-box finding to (sarif)")
+    r.add_argument("-o", "--output", help="output path for --format pdf or sarif")
     return p
 
 
@@ -351,6 +399,8 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
             return cmd_scan(args, client)
         if args.command == "profile":
             return cmd_profile(args, client)
+        if args.command == "audit-code":
+            return cmd_audit_code(args)
         return cmd_report(args)
     except ConnectorError as e:
         print(f"Error: {e}", file=sys.stderr)
