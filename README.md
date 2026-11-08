@@ -27,6 +27,30 @@ AegisAI se connecte à une application IA via son API, lui envoie des **scénari
 
 Ce n'est pas un détecteur de mots-clés dans du code : il teste le **comportement réel** d'une application en fonctionnement.
 
+## Essayer en 1 minute
+
+Aucune application cible, aucune clef d'API : AegisAI embarque un labo volontairement vulnérable et sa variante corrigée.
+
+**Option A : en ligne de commande (Python 3.11+)**
+
+```bash
+git clone https://github.com/Stellouuuuu/aegisai.git && cd aegisai
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[demo]"
+aegis scan --target demo:vulnerable-chatbot      # 14 failles trouvées, score 0/100
+aegis scan --target demo:patched-chatbot         # 0 faille, score 100/100
+```
+
+**Option B : dashboard complet avec Docker**
+
+```bash
+docker compose up --build        # si le port 8080 est pris : DASHBOARD_PORT=8090 docker compose up --build
+```
+
+Ouvrez http://localhost:8080, créez un compte (n'importe quel e-mail, 10 caractères de mot de passe minimum), puis « New target » et scannez `http://lab:8001/chat` avec « Tool calls location » réglé sur `$.tool_calls`. Le résultat apparaît en quelques secondes.
+
+**Sans rien installer :** des rapports générés par ces deux scans sont déjà dans le dépôt, dans [`docs/examples/`](./docs/examples/) : [rapport PDF du labo vulnérable](./docs/examples/demo-vulnerable.pdf), [son JSON](./docs/examples/demo-vulnerable.json) et [le JSON de la variante corrigée](./docs/examples/demo-patched.json).
+
 ## Aperçu
 
 <div align="center">
