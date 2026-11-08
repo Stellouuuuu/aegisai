@@ -249,7 +249,7 @@ Dans l'API, le champ `second_auth` prend le même format que `auth` (référence
 
 ### Un cas réel : l'audit de Mnemo
 
-AegisAI a servi à auditer un assistant local construit à côté, Mnemo (chat, mémoire, RAG). Premier scan : 45 sur 100, avec des injections de prompt confirmées et un fragment du prompt système restitué ; après deux correctifs (règles du prompt et garde côté serveur contre la fuite des instructions), 74 puis 81 sur 100. Le rapport trie aussi ce qui n'a pas été corrigé et pourquoi : [`audit-v0.4.md`](https://github.com/Stellouuuuu/stella-ai/blob/main/docs/securite/audit-v0.4.md).
+AegisAI a servi à auditer un assistant local construit à côté, Mnemo (chat, mémoire, RAG). Premier scan : 45 sur 100, avec des injections de prompt confirmées et un fragment du prompt système restitué ; après deux correctifs (règles du prompt et garde côté serveur contre la fuite des instructions), 74 puis 81 sur 100. Le rapport trie aussi ce qui n'a pas été corrigé et pourquoi : [`audit-v0.4.md`](https://github.com/Stellouuuuu/mnemo/blob/main/docs/securite/audit-v0.4.md).
 
 ## Comment une faille est prouvée
 
