@@ -40,9 +40,11 @@ def run_module(
         sid = payload.scenario_id
         if sid in findings or baseline_violates(module, sid, baseline):
             continue  # one proven finding per scenario is enough
+        if payload.turns and not connector.supports_conversation:
+            continue  # a multi-turn attack needs a target that keeps the conversation
         tried[sid] = tried.get(sid, 0) + 1
         try:
-            response = connector.send(payload.text)
+            response = connector.send_payload(payload)
         except ConnectorError:
             continue
         verdict = module.detect(payload, response)

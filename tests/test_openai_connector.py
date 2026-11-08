@@ -120,3 +120,48 @@ def test_cli_preset_requires_a_model(capsys) -> None:
     args = ["scan", "--preset", "openai", "--url", URL, "--confirm-authorized"]
     assert main(args) == 2
     assert "--model" in capsys.readouterr().err
+
+
+def test_conversation_replays_the_history_in_the_messages_list() -> None:
+    import json
+
+    import httpx
+
+    from engine.connector import HttpConnector, TargetConfig, openai_config
+
+    bodies: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        n = len(bodies)
+        return httpx.Response(200, json={"choices": [{"message": {"content": f"reply {n}"}}]})
+
+    cfg = openai_config("m", url="http://x/v1/chat/completions", token=None, system_prompt="sys")
+    c = HttpConnector(
+        TargetConfig(
+            url=cfg["url"], request_template=cfg["request_template"],
+            response_path=cfg["response_path"],
+        ),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    assert c.supports_conversation
+    out = c.converse(("one", "two", "three"))
+    assert out.replies == ("reply 1", "reply 2", "reply 3")
+    third = [(m["role"], m["content"]) for m in bodies[2]["messages"]]
+    assert third == [("system", "sys"), ("user", "one"), ("assistant", "reply 1"),
+                     ("user", "two"), ("assistant", "reply 2"), ("user", "three")]
+
+
+def test_a_stateless_template_cannot_hold_a_conversation() -> None:
+    import httpx
+    import pytest
+
+    from engine.connector import ConnectorError, HttpConnector, TargetConfig
+
+    c = HttpConnector(
+        TargetConfig(url="http://x/chat"),
+        client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={}))),
+    )
+    assert not c.supports_conversation
+    with pytest.raises(ConnectorError):
+        c.converse(("a", "b"))

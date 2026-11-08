@@ -45,6 +45,9 @@ class Payload:
     text: str
     scenario_id: str = ""
     canary: str | None = None
+    # A conversation: the user messages sent one after the other in the same session. When set,
+    # `text` is only a readable summary of it.
+    turns: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

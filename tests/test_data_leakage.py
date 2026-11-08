@@ -28,7 +28,7 @@ def test_module_follows_plugin_protocol() -> None:
     m = DataLeakageModule()
     assert isinstance(m, AttackModule)
     ids = {p.scenario_id for p in m.generate_payloads(None)}  # type: ignore[arg-type]
-    assert ids == {"DL-01", "DL-02"}
+    assert ids == {"DL-01", "DL-02", "DL-05"}
 
 
 def test_detects_planted_flaws_in_vulnerable_lab(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -12,6 +12,8 @@ from engine.core.module import AttackModule, ResponseLike
 class Sender(Protocol):
     def send(self, prompt: str) -> Any: ...
 
+    def send_payload(self, payload: Payload) -> Any: ...
+
 
 STABLE_RATE = 0.75  # with 3 replays: at least 2 of 3 must reproduce
 
@@ -50,6 +52,6 @@ def replay(
     connector: Sender, module: AttackModule, payload: Payload, attempts: int
 ) -> ReplayResult:
     hits = sum(
-        module.detect(payload, connector.send(payload.text)).violated for _ in range(attempts)
+        module.detect(payload, connector.send_payload(payload)).violated for _ in range(attempts)
     )
     return ReplayResult(hits=hits, attempts=attempts)

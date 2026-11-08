@@ -37,7 +37,7 @@ Il vaut mieux 4 vulnérabilités **prouvées et reproductibles** que 20 alertes 
 - [x] `Connector` HTTP générique (template configurable, préréglage compatible OpenAI, streaming SSE)
 - [x] `Profiler` de base (chatbot, agent, RAG ; `aegis profile`, `--modules auto`, endpoint API, bouton du dashboard)
 - [x] `Orchestrator` avec rate limiting et profondeurs quick/standard/deep (rate limiting, profondeurs, annulation et exécution parallèle des modules faits)
-- [x] 4 modules d'attaque (plugins) : 17 scénarios implémentés sur 20 du catalogue MVP (les 3 autres : multi-tours, multi-utilisateurs, RAG)
+- [x] 4 modules d'attaque (plugins) : 18 scénarios implémentés sur 20 du catalogue MVP (les 2 autres : multi-utilisateurs, RAG)
 - [x] `Detectors` (canary, marqueurs, appels d'outils)
 - [x] `Evaluators` (répétition, baseline, niveau de confiance)
 - [x] `Risk Engine` (gravité × exploitabilité × confiance)

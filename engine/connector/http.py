@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -19,6 +20,7 @@ from engine.connector.jsonpath import JsonPathError, extract
 log = logging.getLogger("aegis.connector")
 
 PLACEHOLDER = "{{PROMPT}}"
+SESSION_PLACEHOLDER = "{{SESSION}}"
 _ENV = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
@@ -80,6 +82,14 @@ class TargetResponse:
     raw: Any = None
 
 
+@dataclass(frozen=True)
+class ConversationResponse(TargetResponse):
+    """The outcome of a multi-turn attack: `text` joins every reply, `replies` keeps them apart
+    so a detector can reason turn by turn."""
+
+    replies: tuple[str, ...] = ()
+
+
 def normalize_tool_call(call: Any) -> Any:
     """OpenAI style {"function": {"name", "arguments"}} -> {"name", "arguments"}: one shape for
     every module. Anything else is returned unchanged."""
@@ -123,8 +133,9 @@ def assemble_sse(lines: Any) -> dict[str, Any]:
     return {"choices": [{"message": message}]}
 
 
-def render_template(template: Any, prompt: str) -> Any:
-    """Substitute {{PROMPT}} in every string of a JSON-like template.
+def render_template(template: Any, prompt: str, session: str = "") -> Any:
+    """Substitute {{PROMPT}} (and {{SESSION}}, a conversation id) in every string of a
+    JSON-like template.
 
     Working on the parsed structure (not on raw text) means the prompt can
     contain quotes/newlines without breaking the JSON body.
@@ -132,15 +143,31 @@ def render_template(template: Any, prompt: str) -> Any:
     if isinstance(template, str):
         if template.lstrip().startswith(("{", "[")):
             try:
-                return render_template(json.loads(template), prompt)
+                return render_template(json.loads(template), prompt, session)
             except json.JSONDecodeError:
                 pass
-        return template.replace(PLACEHOLDER, prompt)
+        return template.replace(SESSION_PLACEHOLDER, session).replace(PLACEHOLDER, prompt)
     if isinstance(template, dict):
-        return {k: render_template(v, prompt) for k, v in template.items()}
+        return {k: render_template(v, prompt, session) for k, v in template.items()}
     if isinstance(template, list):
-        return [render_template(v, prompt) for v in template]
+        return [render_template(v, prompt, session) for v in template]
     return template
+
+
+def _messages_list(template: Any) -> list[Any] | None:
+    """The OpenAI style "messages" list of a request template, if it has a user message."""
+    data = template
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            return None
+    msgs = data.get("messages") if isinstance(data, dict) else None
+    if isinstance(msgs, list) and any(
+        isinstance(m, dict) and m.get("role") == "user" for m in msgs
+    ):
+        return msgs
+    return None
 
 
 class HttpConnector:
@@ -164,10 +191,64 @@ class HttpConnector:
         with self._lock:
             self.history.append(record)
 
-    def send(self, prompt: str) -> TargetResponse:
+    @property
+    def supports_conversation(self) -> bool:
+        """True if earlier turns can be carried over: an OpenAI style "messages" list (the
+        history is replayed in it) or a {{SESSION}} id that the application keeps state for."""
+        tpl = self.config.request_template
+        in_template = SESSION_PLACEHOLDER in (tpl if isinstance(tpl, str) else json.dumps(tpl))
+        return in_template or _messages_list(tpl) is not None
+
+    def converse(self, turns: tuple[str, ...] | list[str]) -> ConversationResponse:
+        """Send `turns` one after the other in a fresh conversation."""
+        if not self.supports_conversation:
+            raise ConnectorError(
+                "This target cannot hold a conversation: use an OpenAI style 'messages' "
+                "template, or add a {{SESSION}} placeholder the application keeps state for."
+            )
+        session = uuid.uuid4().hex
+        history: list[tuple[str, str]] = []
+        replies: list[TargetResponse] = []
+        for turn in turns:
+            r = self.send(turn, history=history, session=session)
+            history.append((turn, r.text))
+            replies.append(r)
+        return ConversationResponse(
+            text="\n---\n".join(r.text for r in replies),
+            status_code=replies[-1].status_code if replies else 0,
+            tool_calls=[c for r in replies for c in r.tool_calls],
+            raw=[r.raw for r in replies],
+            replies=tuple(r.text for r in replies),
+        )
+
+    def send_payload(self, payload: Any) -> TargetResponse:
+        """One request, or a whole conversation when the payload has turns."""
+        if getattr(payload, "turns", ()):
+            return self.converse(payload.turns)
+        return self.send(payload.text)
+
+    def send(
+        self,
+        prompt: str,
+        history: list[tuple[str, str]] | None = None,
+        session: str = "",
+    ) -> TargetResponse:
         cfg = self.config
         self._throttle()
-        body = render_template(cfg.request_template, prompt)
+        body = render_template(cfg.request_template, prompt, session)
+        if history:
+            msgs = body.get("messages") if isinstance(body, dict) else None
+            if isinstance(msgs, list):  # replay the earlier turns just before the new question
+                users = [
+                    i for i, m in enumerate(msgs) if isinstance(m, dict) and m.get("role") == "user"
+                ]
+                last_user = users[-1] if users else len(msgs)
+                past = [
+                    {"role": role, "content": text}
+                    for user, reply in history
+                    for role, text in (("user", user), ("assistant", reply))
+                ]
+                body = {**body, "messages": msgs[:last_user] + past + msgs[last_user:]}
         headers = cfg.auth.build_headers()
         record: dict[str, Any] = {
             "ts": datetime.now(UTC).isoformat(),
