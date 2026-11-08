@@ -90,7 +90,7 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Exécution parallèle des modules (`--workers`, aussi dans l'API et le dashboard) | fait |
 | 15 des 20 scénarios du catalogue MVP | fait |
 | Module RAG (v2, premier jalon : document piégé, secret extrait, isolation des documents) | fait |
-| Attaques adaptatives (v3, premier jalon : réécritures guidées par les réponses) | fait |
+| Attaques adaptatives (v3 : `--adversarial`, réécritures guidées par les réponses, attaquant LLM optionnel) | fait, mesuré sur Mistral |
 | White-box (analyse du code) et export SARIF (v4) | à faire |
 
 **Validation sur un vrai LLM (Mistral via Ollama, scan complet des 15 scénarios, 5 scans par mode) :** score de 14 à 45 (moyenne 24,8) sur la variante vulnérable contre 73 à 85 (moyenne 78,8) sur la variante durcie. Les failles ciblées par le durcissement (fuite de canary et de system prompt, HTML non échappé, outils) disparaissent ; les scénarios que le durcissement ne vise pas (persona, injection) restent détectés, car le modèle y obéit réellement. Détails, rappel par scénario et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
@@ -138,6 +138,8 @@ aegis scan --preset openai --model mistral --url http://localhost:11434/v1/chat/
 Le préréglage fournit le corps de requête, les chemins de réponse et d'appels d'outils ; les appels d'outils au format OpenAI sont normalisés pour les modules, et le streaming (server-sent events) est reconstitué avant analyse.
 
 `--workers N` exécute jusqu'à N modules en parallèle (la limite `--min-interval` reste globale). Mesuré sur Mistral local, un seul GPU : 99 s en séquentiel contre 126 s avec 4 workers, car le GPU traite les requêtes une par une. L'option sert pour les API hébergées, pas pour un modèle local.
+
+Pour retenter les scénarios qui ont résisté, `--adversarial 4` réessaie chacun avec jusqu'à 4 prompts réécrits (jeu de rôle, faux délimiteurs, encodage, exemples guidés...), choisis selon la dernière réponse de l'application. `--attacker-model mistral` ajoute un modèle qui reformule après un refus (API compatible OpenAI, Ollama local par défaut). Le finding indique la réécriture qui a fonctionné (`extra.adversarial`). Dans l'API, le champ est `adversarial_rounds`.
 
 Pour laisser AegisAI choisir les tests, `aegis profile --url ... --confirm-authorized` devine le type d'application (chatbot, agent, RAG) à partir de deux questions inoffensives, et `aegis scan --modules auto` lance directement les modules recommandés.
 

@@ -213,6 +213,35 @@ The hardened bot searches only the asker's own documents and fences them as untr
   out of the prompt, not because of the model. Documents were removed after each attack.
 - Small sample again: 5 scans, one model, a keyword retriever instead of a vector store.
 
+## Seventh series: the adaptive pass
+
+The adaptive pass (`--adversarial 4 --attacker-model mistral`) retries every scenario that found
+nothing with up to 4 rewritten prompts, picked from how the application answered the previous
+one, or rewritten by Mistral itself after a refusal. Measured with the `prompt_injection` and
+`data_leakage` modules, 3 scans per mode (a scan takes 2.5 to 5.5 minutes with the pass).
+
+| Scan | Found by the normal pass | Added by the adaptive pass |
+|---|---|---|
+| Vulnerable 1 | DL-01, DL-02, PI-02 | PI-03 (few_shot), PI-06 (english), PI-05 (llm_rewrite) |
+| Vulnerable 2 | DL-01, DL-02, PI-02, PI-03 | PI-04 (english), PI-06 (authority, needs review) |
+| Vulnerable 3 | DL-01, DL-02, PI-06 | PI-03 (few_shot), PI-04 (english), PI-05 (refusal_suppression, needs review) |
+| Hardened 1 | PI-03, PI-05, PI-06 | PI-04 (few_shot) |
+| Hardened 2 | PI-05, PI-06 | nothing |
+| Hardened 3 | PI-03, PI-06 | PI-02 (english) |
+
+Scores: 39 to 59 on the vulnerable bot, 61 to 89 on the hardened one.
+
+- **The pass added 2 or 3 scenarios per scan on the vulnerable bot and 0 or 1 on the hardened
+  one**, most of them confirmed. PI-04 was never found by the fixed prompts in the fourth series
+  and is found here with `english` and `few_shot` wrappers, so the rewrites do widen coverage.
+- **This does not prove the strategies are smarter than plain retries.** The pass also gives each
+  scenario up to 4 extra attempts, and the model is non-deterministic: PI-03, which the normal pass
+  missed in two scans, was found by it in others. A fair control would repeat the fixed prompts the
+  same number of times. It was not run.
+- **The hardened bot still lets injection through**, as in the fourth series: its hardening does
+  not target instruction override, so extra findings there are real behaviour, not noise.
+- 3 scans per mode, one model, one prompt set: the numbers show the mechanism works, not a rate.
+
 ## Limits, stated plainly
 
 - **Recall is not 100 %.** On the vulnerable bot, detection per scenario ranges from 4/5 to 5/5
