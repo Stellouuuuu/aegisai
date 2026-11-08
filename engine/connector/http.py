@@ -62,7 +62,11 @@ class AuthConfig:
 @dataclass(frozen=True)
 class IngestConfig:
     """How to add and remove a document in a RAG application's knowledge base. Placeholders:
-    {{DOC_ID}} and {{DOCUMENT}} in the request template, {{DOC_ID}} in the delete URL."""
+    {{DOC_ID}} and {{DOCUMENT}} in the request template and headers, {{DOC_ID}} in the delete URL.
+
+    By default the document is sent as JSON. With `content_type` the rendered template is sent
+    as the raw body instead (a file upload). With `id_path` the id the application gave to the
+    document is read from the response and used to delete it."""
 
     url: str
     method: str = "POST"
@@ -71,6 +75,9 @@ class IngestConfig:
     )
     delete_url: str | None = None
     delete_method: str = "DELETE"
+    content_type: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
+    id_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -204,6 +211,7 @@ class HttpConnector:
         self._lock = threading.Lock()
         self.history: list[dict[str, Any]] = []
         self.peer: HttpConnector | None = None
+        self._remote_ids: dict[str, str] = {}  # our document id -> the id the application chose
 
     def _throttle(self) -> None:
         # Holding the lock while sleeping serialises request starts, so min_interval is a
@@ -278,12 +286,21 @@ class HttpConnector:
     def supports_ingest(self) -> bool:
         return self.config.ingest is not None
 
-    def _call(self, method: str, url: str, body: Any = None) -> int:
+    def _call(
+        self,
+        method: str,
+        url: str,
+        body: Any = None,
+        *,
+        content: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
         self._throttle()
+        merged = {**self.config.auth.build_headers(), **(headers or {})}
         try:
             r = self._client.request(
-                method, url, json=body, headers=self.config.auth.build_headers(),
-                timeout=self.config.timeout,
+                method, url, headers=merged, timeout=self.config.timeout,
+                **({"content": content} if content is not None else {"json": body}),
             )
         except httpx.HTTPError as e:
             raise ConnectorError(f"Request to {url} failed: {e}") from e
@@ -291,15 +308,30 @@ class HttpConnector:
                       "prompt": "(knowledge base)", "status": r.status_code})
         if r.status_code >= 400:
             raise ConnectorError(f"Target returned HTTP {r.status_code} on {method} {url}")
-        return r.status_code
+        return r
 
     def ingest_document(self, doc_id: str, text: str) -> None:
         """Add a document to the application's knowledge base (RAG scenarios)."""
         ing = self.config.ingest
         if ing is None:
             raise ConnectorError("This target has no 'ingest' configuration.")
-        body = _fill(ing.request_template, {"DOC_ID": doc_id, "DOCUMENT": text})
-        self._call(ing.method, ing.url, body)
+        values = {"DOC_ID": doc_id, "DOCUMENT": text}
+        body = _fill(ing.request_template, values)
+        if ing.content_type:
+            extra = {k: _fill(v, values) for k, v in ing.headers.items()}
+            extra["Content-Type"] = ing.content_type
+            payload = body if isinstance(body, str) else json.dumps(body)
+            response = self._call(ing.method, ing.url, content=payload.encode(), headers=extra)
+        else:
+            response = self._call(
+                ing.method, ing.url, body,
+                headers={k: _fill(v, values) for k, v in ing.headers.items()},
+            )
+        if ing.id_path:
+            try:
+                self._remote_ids[doc_id] = str(extract(response.json(), ing.id_path))
+            except (ValueError, JsonPathError):
+                log.warning("could not read the id of document %s from the response", doc_id)
 
     def delete_document(self, doc_id: str) -> None:
         """Remove a document added by ingest_document. Best effort: a failure is only logged."""
@@ -307,7 +339,8 @@ class HttpConnector:
         if ing is None or not ing.delete_url:
             return
         try:
-            self._call(ing.delete_method, ing.delete_url.replace("{{DOC_ID}}", doc_id))
+            remote = self._remote_ids.pop(doc_id, doc_id)
+            self._call(ing.delete_method, ing.delete_url.replace("{{DOC_ID}}", remote))
         except ConnectorError as e:
             log.warning("could not remove document %s: %s", doc_id, e)
 

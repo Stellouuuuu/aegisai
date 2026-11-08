@@ -62,6 +62,9 @@ class IngestIn(BaseModel):
     request_template: Any = {"id": "{{DOC_ID}}", "text": "{{DOCUMENT}}"}
     delete_url: str | None = Field(default=None, pattern=r"^https?://")
     delete_method: Literal["DELETE", "POST"] = "DELETE"
+    content_type: str | None = Field(default=None, pattern=r"^[\w.+-]+/[\w.+-]+$")
+    headers: dict[str, str] = Field(default_factory=dict, max_length=10)
+    id_path: str | None = Field(default=None, max_length=200)
 
 
 class TargetIn(BaseModel):

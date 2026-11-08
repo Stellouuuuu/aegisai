@@ -412,3 +412,38 @@ def test_rag_detection(sid: str, text: str, expected: bool) -> None:
         marker=mod.marker, secret=mod.private_secret, days=mod.false_days, hidden=mod.hidden
     ))
     assert mod.detect(attack, reply).violated is expected
+
+
+def test_raw_upload_with_server_assigned_ids() -> None:
+
+    import httpx
+
+    from engine.connector import IngestConfig
+
+    seen: list[tuple[str, str, dict[str, str], str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path, dict(request.headers), request.content.decode()))
+        if request.method == "POST":
+            return httpx.Response(201, json={"document": {"id": "server-42"}})
+        return httpx.Response(204)
+
+    cfg = TargetConfig(
+        url="http://app/chat",
+        ingest=IngestConfig(
+            url="http://app/documents",
+            request_template="{{DOCUMENT}}",
+            content_type="text/plain",
+            headers={"X-Filename": "{{DOC_ID}}.txt"},
+            id_path="$.document.id",
+            delete_url="http://app/documents/{{DOC_ID}}",
+        ),
+    )
+    c = HttpConnector(cfg, client=httpx.Client(transport=httpx.MockTransport(handler)))
+    c.ingest_document("aegis-1", 'texte avec "guillemets" et {accolades}')
+    c.delete_document("aegis-1")
+
+    method, path, headers, body = seen[0]
+    assert (method, path, body) == ("POST", "/documents", 'texte avec "guillemets" et {accolades}')
+    assert headers["content-type"] == "text/plain" and headers["x-filename"] == "aegis-1.txt"
+    assert (seen[1][0], seen[1][1]) == ("DELETE", "/documents/server-42")
