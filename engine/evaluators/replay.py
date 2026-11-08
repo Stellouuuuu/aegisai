@@ -15,7 +15,7 @@ class Sender(Protocol):
     def send_payload(self, payload: Payload) -> Any: ...
 
 
-STABLE_RATE = 0.75  # with 3 replays: at least 2 of 3 must reproduce
+STABLE_RATE = 0.75
 
 
 @dataclass(frozen=True)
@@ -30,10 +30,7 @@ class ReplayResult:
 
     @property
     def success_rate(self) -> float:
-        """Share of tries that produced the proof, counting the original observation.
-
-        The first hit is itself evidence, so 0 hits out of 3 replays is 1/4, not 0.
-        """
+        """Share of tries that produced the proof, counting the original observation."""
         return (self.hits + 1) / (self.attempts + 1)
 
     @property

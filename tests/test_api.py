@@ -97,10 +97,8 @@ def test_full_flow_scan_findings_report_retest(api: TestClient, monkeypatch) -> 
     pdf = api.get(f"/assessments/{aid}/report.pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
 
-    # retest while still vulnerable: stays open
     assert api.post(f"/findings/{fid}/retest").json()["status"] == "open"
 
-    # the app gets fixed: retest turns the findings into resolved and the score recovers
     monkeypatch.setenv("AEGIS_LAB_MODE", "patched")
     for f in findings:
         assert api.post(f"/findings/{f['id']}/retest").json()["status"] == "resolved"
@@ -131,7 +129,6 @@ def test_unreachable_target_marks_assessment_failed(tmp_path) -> None:
     assert api.get(f"/assessments/{aid}/report").status_code == 409
 
 
-# accounts and isolation
 
 def test_endpoints_require_authentication(tmp_path) -> None:
     anon = TestClient(make_app(tmp_path))
@@ -166,7 +163,7 @@ def test_login_is_throttled_after_repeated_failures(tmp_path) -> None:
     codes = [c.post("/auth/login", json=bad).status_code for _ in range(6)]
     assert codes[:5] == [401] * 5 and codes[5] == 429
     good = {"email": "t@example.com", "password": PASSWORD}
-    assert c.post("/auth/login", json=good).status_code == 429  # locked even with right password
+    assert c.post("/auth/login", json=good).status_code == 429
 
 
 def test_registration_can_be_disabled(tmp_path) -> None:
@@ -244,7 +241,6 @@ def test_target_options_stream_and_timeout_reach_the_connector() -> None:
 def test_scan_options_allowed_tools_and_workers(api: TestClient, monkeypatch) -> None:
     monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
     pid = new_project(api)
-    # without the list, TS-01 cannot be judged and is skipped
     plain = api.get(f"/assessments/{scan(api, pid).json()['id']}/findings").json()
     assert "TS-01" not in {f["scenario_id"] for f in plain}
 

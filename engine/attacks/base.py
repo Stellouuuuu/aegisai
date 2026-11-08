@@ -10,7 +10,7 @@ class ScenarioModule:
     owasp_ref: str
     atlas_ref: str | None = None
     SCENARIOS: dict[str, Scenario]
-    PROMPTS: dict[str, list[str]]  # several formulations per scenario
+    PROMPTS: dict[str, list[str]]
     safe_behavior: str = ""
 
     def generate_payloads(self, profile: AppProfile) -> list[Payload]:

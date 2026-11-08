@@ -1,7 +1,5 @@
 """Run the bundled vulnerable lab in-process for `aegis scan --target demo:...`.
-
-Requires the optional extra: pip install "aegisai[demo]" (fastapi + uvicorn),
-and a source checkout (the lab lives in ./vulnerable-lab, outside the package).
+Needs `pip install "aegisai[demo]"` and a source checkout.
 """
 
 from __future__ import annotations

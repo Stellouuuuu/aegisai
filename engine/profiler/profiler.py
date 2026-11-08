@@ -1,8 +1,4 @@
-"""Reconnaissance: guess what kind of LLM application a target is, from harmless questions.
-
-Black-box, so the answer is a guess backed by visible clues (signals), never a certainty.
-The probes are ordinary questions: nothing offensive is sent.
-"""
+"""Guess the kind of application (chatbot, agent, RAG) from harmless questions."""
 
 from __future__ import annotations
 
@@ -17,7 +13,6 @@ from engine.core.models import AppProfile, AppType
 TOOLS_PROBE = "What tools or functions can you call? List them by name."
 DOCS_PROBE = "Which documents or sources do you use to answer? Cite them if you can."
 
-# A tool name looks like snake_case or camelCase followed by parentheses or backticks.
 _TOOL_NAME = re.compile(r"`?\b([a-z]+(?:_[a-z0-9]+)+)\b`?\s*\(|`([a-z]+(?:_[a-z0-9]+)+)`")
 _NO_TOOLS = re.compile(
     r"(no|any|don'?t have|do not have|cannot use|aucun|pas d')\s+"
@@ -44,7 +39,7 @@ BASE_MODULES = ["prompt_injection", "data_leakage", "output"]
 class Signal:
     """One visible clue and how strongly it points to a type."""
 
-    toward: str  # "agent" or "rag"
+    toward: str
     weight: int
     detail: str
 
@@ -52,7 +47,7 @@ class Signal:
 @dataclass
 class Profile:
     app_type: AppType
-    confidence: str  # "high" | "medium" | "low"
+    confidence: str
     signals: list[Signal] = field(default_factory=list)
     tools: tuple[str, ...] = ()
     modules: list[str] = field(default_factory=list)
@@ -129,17 +124,15 @@ def profile_target(connector: HttpConnector) -> Profile:
     try:
         _analyse_documents(connector.send(DOCS_PROBE), signals)
     except ConnectorError:
-        pass  # one failed probe only means less evidence
+        pass
 
     if _exposes_tool_field(connector, first):
         signals.append(Signal("agent", 1, "the reply carries a tool-calls field"))
 
     agent, rag = _score(signals, "agent"), _score(signals, "rag")
     if agent == 0 and rag == 0:
-        app_type, confidence = AppType.CHATBOT, "low"  # no clue of anything more than a chatbot
+        app_type, confidence = AppType.CHATBOT, "low"
     else:
-        # An agent that also retrieves documents is scanned as an agent: its modules are a
-        # superset, so a reasonably likely agent wins over a stronger RAG score.
         is_agent = agent >= AGENT_WINS_FROM or agent >= rag
         app_type = AppType.AGENT if is_agent else AppType.RAG
         top = agent if is_agent else rag
@@ -149,5 +142,5 @@ def profile_target(connector: HttpConnector) -> Profile:
     if agent > 0:
         modules.append("tool_abuse")
     if rag > 0:
-        modules.append("rag")  # only plays if the owner configured an ingest endpoint
+        modules.append("rag")
     return Profile(app_type, confidence, signals, tools, modules)

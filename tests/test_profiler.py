@@ -76,7 +76,6 @@ def test_tool_calls_field_present_in_the_reply_is_a_weak_hint() -> None:
 
 
 def test_configured_but_absent_tool_calls_field_proves_nothing() -> None:
-    # OpenAI style servers omit the field when the model calls no tool.
     first = TargetResponse("Hello.", 200, raw={"choices": [{"message": {"content": "Hello."}}]})
     p = profile_target(Fake([first, "Hello."], tool_calls_path="$.choices[0].message.tool_calls"))
     assert p.app_type is AppType.CHATBOT and p.signals == []

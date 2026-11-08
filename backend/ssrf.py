@@ -1,12 +1,6 @@
-"""Target policy: stop the API from being used to probe internal networks (SSRF).
-
-By default private, loopback, link-local and reserved addresses are refused.
-Operators can allow specific hosts (AEGIS_ALLOWED_HOSTS=localhost,lab) or
-everything (AEGIS_ALLOW_PRIVATE_TARGETS=1) for a local setup.
-
-Known limit: DNS is resolved at check time and again when connecting
-(DNS rebinding). The check is repeated just before each scan to narrow the window.
-Redirects are not followed by the connector.
+"""Target policy against SSRF: private, loopback, link-local and reserved addresses are refused
+unless allowed (AEGIS_ALLOWED_HOSTS, AEGIS_ALLOW_PRIVATE_TARGETS). DNS is resolved again when
+connecting, so rebinding stays possible; redirects are not followed.
 """
 
 from __future__ import annotations

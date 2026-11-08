@@ -35,7 +35,7 @@ def test_detects_planted_flaws_in_vulnerable_lab(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
     findings = run_module(lab_connector(), DataLeakageModule())
     by_id = {f.id: f for f in findings}
-    assert set(by_id) == {"DL-01", "DL-02"}  # recall 2/2 on the lab's data-leak flaws
+    assert set(by_id) == {"DL-01", "DL-02"}
     for f in findings:
         assert f.confidence is Confidence.CONFIRMED and f.reproducible
         assert lab.CANARY in f.response
@@ -49,13 +49,11 @@ def test_no_findings_on_patched_lab(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_baseline_leak_means_no_finding() -> None:
-    # Target that always prints the canary: any "detection" would be meaningless.
     c = mock_connector(lambda _m: "Code: SECRET_TEST_4821")
     assert run_module(c, DataLeakageModule()) == []
 
 
 def test_unstable_leak_needs_review() -> None:
-    # Leaks only on the first attack attempt, then behaves: not reproducible.
     state = {"n": 0}
 
     def reply(msg: str) -> str:
@@ -88,7 +86,6 @@ def test_markdown_escaped_canary_is_still_detected() -> None:
 
 
 def test_mostly_reproducible_leak_is_confirmed_but_not_strictly_reproducible() -> None:
-    # Leaks on 1st try and 2 of 3 replays: a non-deterministic model, still a real finding.
     state = {"n": 0}
 
     def reply(msg: str) -> str:

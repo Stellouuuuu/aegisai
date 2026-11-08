@@ -45,17 +45,11 @@ class Payload:
     text: str
     scenario_id: str = ""
     canary: str | None = None
-    # A conversation: the user messages sent one after the other in the same session. When set,
-    # `text` is only a readable summary of it.
     turns: tuple[str, ...] = ()
-    # Messages sent first as the application's main user (the victim), before `text` is sent as
-    # a second, unrelated user. Needs a second identity (`second_auth`) on the connector.
     plant: tuple[str, ...] = ()
-    # Documents (id, text) added to the application's knowledge base before the question, by the
-    # main user, then removed. Needs an `ingest` endpoint on the connector (RAG scenarios).
     documents: tuple[tuple[str, str], ...] = ()
-    # Ask `text` as the second user instead of the main one (isolation scenarios).
     as_other_user: bool = False
+    documents_by_other_user: bool = False
 
 
 @dataclass(frozen=True)
@@ -82,7 +76,7 @@ class Verdict:
 
     violated: bool
     evidence: str = ""
-    deterministic: bool = True  # False => heuristic evidence, human review needed
+    deterministic: bool = True
 
 
 @dataclass(frozen=True)
@@ -115,8 +109,8 @@ class Finding:
     recommendation: str
     atlas: str | None = None
     reproducible: bool = False
-    exploitability: float | None = None  # 0..1, set by the risk engine
-    risk_score: float | None = None  # 0..10, set by the risk engine
+    exploitability: float | None = None
+    risk_score: float | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod

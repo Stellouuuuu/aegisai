@@ -18,6 +18,7 @@ export function NewScan({ projectId }: { projectId: number }) {
   const [depth, setDepth] = useState("standard");
   const [allowedTools, setAllowedTools] = useState("");
   const [workers, setWorkers] = useState(1);
+  const [rounds, setRounds] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -104,6 +105,7 @@ export function NewScan({ projectId }: { projectId: number }) {
         depth,
         allowed_tools: allowedTools.split(",").map((t) => t.trim()).filter(Boolean),
         workers,
+        adversarial_rounds: rounds,
         confirm_authorized: confirmed,
       });
       go(`/assessments/${a.id}`);
@@ -254,6 +256,20 @@ export function NewScan({ projectId }: { projectId: number }) {
               </small>
             </label>
           )}
+          <label>
+            <span>Adaptive rounds</span>
+            <select value={rounds} onChange={(e) => setRounds(Number(e.target.value))}>
+              {[0, 4, 8, 12].map((n) => (
+                <option key={n} value={n}>
+                  {n === 0 ? "0 (off)" : `${n} rewrites per resisted test`}
+                </option>
+              ))}
+            </select>
+            <small>
+              After the scan, every test that found nothing is retried with rewritten prompts
+              (role play, fake delimiters, encodings...). The finding records which rewrite worked.
+            </small>
+          </label>
           <label>
             <span>Parallel modules</span>
             <select value={workers} onChange={(e) => setWorkers(Number(e.target.value))}>

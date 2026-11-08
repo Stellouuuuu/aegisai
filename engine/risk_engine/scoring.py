@@ -1,7 +1,4 @@
-"""Risk scoring: impact x exploitability x confidence (ARCHITECTURE.md 3.7).
-
-risk_score is in [0, 10]. Inspired by CVSS but adapted to LLM findings.
-"""
+"""Risk scoring: impact x exploitability x confidence, in [0, 10] (ARCHITECTURE.md 3.7)."""
 
 from __future__ import annotations
 

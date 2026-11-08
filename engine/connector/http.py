@@ -44,8 +44,8 @@ def expand_env(value: str) -> str:
 class AuthConfig:
     type: Literal["none", "api_key", "bearer", "custom_headers"] = "none"
     token: str = ""
-    header_name: str = "X-API-Key"  # used by api_key
-    headers: dict[str, str] = field(default_factory=dict)  # used by custom_headers
+    header_name: str = "X-API-Key"
+    headers: dict[str, str] = field(default_factory=dict)
 
     def build_headers(self) -> dict[str, str]:
         if self.type == "none":
@@ -69,7 +69,7 @@ class IngestConfig:
     request_template: Any = field(
         default_factory=lambda: {"id": "{{DOC_ID}}", "text": "{{DOCUMENT}}"}
     )
-    delete_url: str | None = None  # e.g. https://app/documents/{{DOC_ID}}; None = no cleanup
+    delete_url: str | None = None
     delete_method: str = "DELETE"
 
 
@@ -79,14 +79,12 @@ class TargetConfig:
     method: str = "POST"
     request_template: Any = field(default_factory=lambda: {"message": PLACEHOLDER})
     response_path: str = "$.reply"
-    tool_calls_path: str | None = None  # optional: where the app reports tool calls
+    tool_calls_path: str | None = None
     auth: AuthConfig = field(default_factory=AuthConfig)
     timeout: float = 30.0
-    min_interval: float = 0.0  # seconds between requests (rate limiting, ENF-03)
-    # Server-sent events (OpenAI style "stream": true). The stream is reassembled into the
-    # ordinary non-streaming shape, so response_path stays the same.
+    min_interval: float = 0.0
     stream: bool = False
-    ingest: IngestConfig | None = None  # RAG applications: where documents can be added
+    ingest: IngestConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -149,12 +147,7 @@ def assemble_sse(lines: Any) -> dict[str, Any]:
 
 
 def render_template(template: Any, prompt: str, session: str = "") -> Any:
-    """Substitute {{PROMPT}} (and {{SESSION}}, a conversation id) in every string of a
-    JSON-like template.
-
-    Working on the parsed structure (not on raw text) means the prompt can
-    contain quotes/newlines without breaking the JSON body.
-    """
+    """Substitute {{PROMPT}} and {{SESSION}} in every string of a JSON-like template."""
     if isinstance(template, str):
         if template.lstrip().startswith(("{", "[")):
             try:
@@ -208,9 +201,8 @@ class HttpConnector:
         self.config = config
         self._client = client or httpx.Client(timeout=config.timeout)
         self._last_sent = 0.0
-        self._lock = threading.Lock()  # one rate limit and one audit trail for all threads
-        self.history: list[dict[str, Any]] = []  # structured audit trail (ENF-05)
-        # A second user of the same application (other credentials), for isolation tests.
+        self._lock = threading.Lock()
+        self.history: list[dict[str, Any]] = []
         self.peer: HttpConnector | None = None
 
     def _throttle(self) -> None:
@@ -257,27 +249,27 @@ class HttpConnector:
         )
 
     def send_payload(self, payload: Any) -> TargetResponse:
-        """One request, a whole conversation when the payload has turns, or a staged attack:
-        documents are added to the knowledge base and messages planted as the main user, then
-        the question is asked (as the second user for isolation scenarios). Documents are
-        always removed afterwards."""
+        """Send one request, a conversation, or a staged attack: documents and messages are
+        planted first, then the question is asked. Planted documents are always removed."""
         documents = getattr(payload, "documents", ())
         plant = getattr(payload, "plant", ())
         other = getattr(payload, "as_other_user", False)
+        contributor = getattr(payload, "documents_by_other_user", False)
         if documents or plant or other:
-            if other and self.peer is None:
+            if (other or contributor) and self.peer is None:
                 raise ConnectorError("This attack needs a second user (second_auth).")
             added: list[str] = []
+            writer = self.peer if contributor and self.peer else self
             try:
                 for doc_id, text in documents:
-                    self.ingest_document(doc_id, text)
+                    writer.ingest_document(doc_id, text)
                     added.append(doc_id)
                 for message in plant:
                     self.send(message)
                 return (self.peer if other and self.peer else self).send(payload.text)
             finally:
                 for doc_id in added:
-                    self.delete_document(doc_id)
+                    writer.delete_document(doc_id)
         if getattr(payload, "turns", ()):
             return self.converse(payload.turns)
         return self.send(payload.text)
@@ -330,7 +322,7 @@ class HttpConnector:
         body = render_template(cfg.request_template, prompt, session)
         if history:
             msgs = body.get("messages") if isinstance(body, dict) else None
-            if isinstance(msgs, list):  # replay the earlier turns just before the new question
+            if isinstance(msgs, list):
                 users = [
                     i for i, m in enumerate(msgs) if isinstance(m, dict) and m.get("role") == "user"
                 ]
@@ -400,7 +392,7 @@ class HttpConnector:
                               (found if isinstance(found, list) else [found])]
             except JsonPathError:
                 pass
-        if text is None:  # a reply made only of tool calls has "content": null
+        if text is None:
             text = ""
         return TargetResponse(
             text=text if isinstance(text, str) else json.dumps(text),

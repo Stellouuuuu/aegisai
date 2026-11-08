@@ -1,8 +1,4 @@
-"""FastAPI application. `create_app` is a factory so tests can inject storage and HTTP client.
-
-Every project, assessment and finding belongs to a user; other users get 404, never 403,
-so the existence of foreign resources is not revealed.
-"""
+"""FastAPI application. Resources owned by another user return 404, never 403."""
 
 from __future__ import annotations
 
@@ -93,7 +89,6 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    # accounts
     @app.post("/auth/register", status_code=201)
     def register(body: CredentialsIn) -> dict[str, Any]:
         if not allow_registration:
@@ -130,7 +125,6 @@ def create_app(
     def me(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
         return {"id": user["id"], "email": user["email"]}
 
-    # projects
     @app.post("/projects", status_code=201)
     def create_project(
         body: ProjectIn, user: dict[str, Any] = Depends(current_user)
@@ -147,7 +141,6 @@ def create_app(
     ) -> dict[str, Any]:
         return own_project(project_id, user)
 
-    # assessments
     @app.post("/projects/{project_id}/assessments", status_code=202)
     def create_assessment(
         project_id: int,
@@ -158,7 +151,7 @@ def create_app(
         own_project(project_id, user)
         try:
             policy.check(body.target.url)
-            if body.target.ingest:  # the knowledge base endpoint is a target too
+            if body.target.ingest:
                 policy.check(body.target.ingest.url)
                 if body.target.ingest.delete_url:
                     policy.check(body.target.ingest.delete_url)
@@ -169,6 +162,7 @@ def create_app(
             config["second_auth"] = body.second_auth.model_dump()
         config["options"] = {
             "allowed_tools": body.allowed_tools, "workers": body.workers,
+            "adversarial_rounds": body.adversarial_rounds,
             "rule_checks": body.rule_checks, "fact_checks": body.fact_checks,
         }
         a = storage.create_assessment(project_id, config, body.modules, body.depth)
@@ -209,7 +203,7 @@ def create_app(
         a = own_assessment(assessment_id, user)
         if a["status"] not in ("pending", "running"):
             raise HTTPException(409, f"assessment is already {a['status']}")
-        cancel.request(assessment_id)  # the scan stops after its current request
+        cancel.request(assessment_id)
         return _redact(a)
 
     @app.get("/assessments/{assessment_id}/findings")

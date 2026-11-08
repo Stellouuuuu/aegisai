@@ -14,9 +14,9 @@ class ResponseLike(Protocol):
 
 @runtime_checkable
 class AttackModule(Protocol):
-    id: str  # e.g. "prompt_injection"
-    owasp_ref: str  # e.g. "LLM01:2025"
-    atlas_ref: str | None  # e.g. "AML.T0051"
+    id: str
+    owasp_ref: str
+    atlas_ref: str | None
 
     def generate_payloads(self, profile: AppProfile) -> list[Payload]: ...
 

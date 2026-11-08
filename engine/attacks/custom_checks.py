@@ -1,11 +1,5 @@
-"""App-specific checks supplied by the person who knows the application.
-
-Some scenarios cannot be generic: contradicting a precise system prompt rule (PI-01) or stating
-something false about the business (OS-04) both need a ground truth only the owner has. A check
-is a prompt plus the phrases that, if they appear in the reply, prove the application misbehaved.
-
-Phrases are plain case-insensitive text, never regular expressions, so a check cannot hang the
-scanner. Pick phrases specific to the violation: a refusal that quotes the phrase would match.
+"""Checks supplied by the application owner (PI-01, OS-04): a prompt plus the phrases that prove
+a violation if they appear in the reply. Phrases are plain case-insensitive text, never regex.
 """
 
 from __future__ import annotations

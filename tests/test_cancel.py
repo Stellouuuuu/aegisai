@@ -26,7 +26,7 @@ def vulnerable_lab(monkeypatch):
 def test_run_module_stops_immediately_when_asked() -> None:
     c = connector()
     assert run_module(c, DataLeakageModule(), should_stop=lambda: True) == []
-    assert c.history == []  # not a single request was sent
+    assert c.history == []
 
 
 def test_run_module_returns_findings_proven_before_the_stop() -> None:
@@ -37,7 +37,7 @@ def test_run_module_returns_findings_proven_before_the_stop() -> None:
 
     def stop_after_first_payload() -> bool:
         calls["n"] += 1
-        return calls["n"] > 2  # baseline check, then one payload, then stop
+        return calls["n"] > 2
 
     partial = run_module(c, DataLeakageModule(), should_stop=stop_after_first_payload)
     assert len(partial) < len(full)
@@ -69,7 +69,7 @@ def test_assessment_cancelled_before_start(tmp_path) -> None:
     scanner.run_assessment(storage, aid, factory, None, registry)
     a = storage.get_assessment(aid)
     assert a["status"] == "cancelled" and storage.list_findings(aid) == []
-    assert not registry.is_requested(aid)  # cleaned up
+    assert not registry.is_requested(aid)
 
 
 def test_assessment_cancelled_midway_keeps_partial_results(tmp_path) -> None:
@@ -86,14 +86,14 @@ def test_assessment_cancelled_midway_keeps_partial_results(tmp_path) -> None:
     assert a["progress"] < 100
     assert a["finished_at"] is not None
     scenarios = {f["scenario_id"] for f in storage.list_findings(aid)}
-    assert scenarios and scenarios < set(lab.KNOWN_VULNS)  # some findings, not all
+    assert scenarios and scenarios < set(lab.KNOWN_VULNS)
 
 
 def test_cancel_endpoint_rejects_finished_and_foreign_assessments(tmp_path) -> None:
     app = make_app(tmp_path)
     alice = login(TestClient(app), "alice@example.com")
     bob = login(TestClient(app), "bob@example.com")
-    aid = scan(alice, new_project(alice)).json()["id"]  # runs to completion in the test client
+    aid = scan(alice, new_project(alice)).json()["id"]
 
     assert alice.post(f"/assessments/{aid}/cancel").status_code == 409
     assert bob.post(f"/assessments/{aid}/cancel").status_code == 404

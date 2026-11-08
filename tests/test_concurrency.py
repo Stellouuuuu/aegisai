@@ -57,8 +57,6 @@ def test_min_interval_is_a_global_limit_across_threads() -> None:
     run_scan(c, mods(), workers=4, repeats=1)
     stamps.sort()
     assert len(stamps) > 8
-    # Individual gaps jitter with thread scheduling (the stamp is taken after the throttle,
-    # not inside it), so check the overall rate: n requests need (n - 1) full intervals.
     span = stamps[-1] - stamps[0]
     assert span >= (len(stamps) - 1) * 0.05 * 0.9
 
@@ -73,5 +71,5 @@ def test_cli_workers_option(tmp_path) -> None:
     base = ["scan", "--url", "http://testserver/chat", "--tool-calls-path", "$.tool_calls",
             "--min-interval", "0", "--confirm-authorized", "--out", str(tmp_path / "r.json")]
     assert main(base + ["--workers", "4"], TestClient(lab.app)) == 0
-    with pytest.raises(SystemExit):  # argparse rejects values outside 1..8
+    with pytest.raises(SystemExit):
         main(base + ["--workers", "99"], TestClient(lab.app))

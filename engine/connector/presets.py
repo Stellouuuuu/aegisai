@@ -14,9 +14,9 @@ def openai_config(
     system_prompt: str | None = None,
     stream: bool = False,
 ) -> dict[str, Any]:
-    """Target config for an OpenAI compatible /chat/completions endpoint (OpenAI, Azure OpenAI
-    gateways, vLLM, LiteLLM, Ollama's /v1 API...). `token` is an ${ENV_VAR} reference, or None
-    for servers that need no key."""
+    """Target config for an OpenAI compatible /chat/completions endpoint. `token` is an ${ENV_VAR}
+    reference, or None for servers without a key.
+    """
     messages: list[dict[str, str]] = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})

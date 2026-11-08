@@ -57,7 +57,7 @@ def test_openai_tool_calls_are_normalised_and_null_content_is_empty() -> None:
     assert out.text == ""
     assert out.tool_calls == [{"name": "delete_emails", "arguments": '{"year": "2023"}', "id": "c1"}]
     verdict = ToolSecurityModule().detect(Payload("x", "TS-02"), out)
-    assert verdict.violated and verdict.deterministic  # a structured call is hard evidence
+    assert verdict.violated and verdict.deterministic
 
 
 def test_streamed_reply_is_reassembled() -> None:

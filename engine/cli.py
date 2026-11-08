@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 
+from engine.adversarial import LlmAttacker, adapt_scan
 from engine.attacks.registry import MODULES, build_modules
 from engine.connector import AuthConfig, ConnectorError, HttpConnector, IngestConfig, TargetConfig
 from engine.connector.presets import OPENAI_URL, openai_config
@@ -34,6 +35,24 @@ def load_config(path: str) -> dict[str, Any]:
 
         return yaml.safe_load(text) or {}
     return json.loads(text)
+
+
+def _attacker(args: argparse.Namespace, client: httpx.Client | None) -> LlmAttacker | None:
+    """An LLM that rewrites resisted prompts, if --attacker-model was given."""
+    if not args.attacker_model:
+        return None
+    cfg = openai_config(
+        args.attacker_model,
+        url=args.attacker_url or "http://localhost:11434/v1/chat/completions",
+        token=args.attacker_token,
+        system_prompt=None,
+    )
+    target = TargetConfig(
+        url=cfg["url"], request_template=cfg["request_template"],
+        response_path=cfg["response_path"], timeout=args.timeout or 120, min_interval=0,
+        auth=AuthConfig(**cfg.get("auth", {})),
+    )
+    return LlmAttacker(HttpConnector(target, client=client))
 
 
 def _peer_from(
@@ -119,7 +138,6 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
 def cmd_scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
     print(LEGAL, file=sys.stderr)
     if args.target:
-        # The bundled lab is our own deliberately vulnerable app: no authorization needed.
         try:
             args.url, stop = start_demo_lab(args.target)
         except DemoUnavailableError as e:
@@ -173,8 +191,16 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
           file=sys.stderr)
 
     start = time.monotonic()
-    findings = assess(run_scan(connector, modules, repeats=DEPTH_REPEATS[args.depth],
-                         workers=args.workers))
+    findings = run_scan(connector, modules, repeats=DEPTH_REPEATS[args.depth],
+                        workers=args.workers)
+    if args.adversarial:
+        attacker = _attacker(args, client)
+        extra = adapt_scan(connector, modules, findings, args.adversarial,
+                           repeats=DEPTH_REPEATS[args.depth], attacker=attacker)
+        print(f"Adaptive pass: {len(extra)} more finding(s) after rewriting resisted attacks.",
+              file=sys.stderr)
+        findings += extra
+    findings = assess(findings)
     report = build_report(
         cfg["url"], findings, module_names, args.depth,
         time.monotonic() - start, len(connector.history),
@@ -290,6 +316,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="run up to N modules in parallel (1 to 8); --min-interval still applies globally. "
         "Useful for hosted APIs; a single-GPU local model gains nothing from it",
     )
+    s.add_argument(
+        "--adversarial", type=int, default=0, choices=range(0, 21), metavar="ROUNDS",
+        help="after the scan, retry every scenario that found nothing with up to ROUNDS "
+        "rewritten prompts (0 = off). The strategy that worked is recorded in the finding",
+    )
+    s.add_argument("--attacker-model", help="model of an OpenAI compatible API that rewrites "
+                   "resisted prompts during the adaptive pass")
+    s.add_argument("--attacker-url", help="its chat completions URL "
+                   "(default: local Ollama, http://localhost:11434/v1/chat/completions)")
+    s.add_argument("--attacker-token", default=None,
+                   help="its API key as ${ENV_VAR} (omit for servers without a key)")
     s.add_argument("--out", default="aegis-report.json")
     s.add_argument("--confirm-authorized", action="store_true",
                    help="confirm you own the target or have written authorization")

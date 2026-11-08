@@ -1,7 +1,4 @@
-"""Sequential runner: Connector -> payloads -> detector -> evaluator -> Finding.
-
-The full orchestrator (profiles, depth, concurrency) will call these functions.
-"""
+"""Runner: Connector -> payloads -> detector -> evaluator -> Finding."""
 
 from __future__ import annotations
 
@@ -39,13 +36,14 @@ def run_module(
             break
         sid = payload.scenario_id
         if sid in findings or baseline_violates(module, sid, baseline):
-            continue  # one proven finding per scenario is enough
+            continue
         if payload.turns and not connector.supports_conversation:
-            continue  # a multi-turn attack needs a target that keeps the conversation
-        if (payload.plant or payload.as_other_user) and connector.peer is None:
-            continue  # a cross-user attack needs a second identity
+            continue
+        needs_peer = payload.plant or payload.as_other_user or payload.documents_by_other_user
+        if needs_peer and connector.peer is None:
+            continue
         if payload.documents and not connector.supports_ingest:
-            continue  # a RAG attack needs a way to add documents to the knowledge base
+            continue
         tried[sid] = tried.get(sid, 0) + 1
         try:
             response = connector.send_payload(payload)
@@ -56,7 +54,6 @@ def run_module(
             continue
 
         rep = replay(connector, module, payload, repeats)
-        # Deterministic evidence + reliable reproduction => confirmed; otherwise a human decides.
         confirmed = verdict.deterministic and rep.stable
         sc = module.scenario(sid)
         findings[sid] = Finding(
@@ -88,9 +85,7 @@ def run_scan(
     should_stop: StopCheck | None = None,
     workers: int = 1,
 ) -> list[Finding]:
-    """Run the modules, one after the other or `workers` at a time. Findings always come back
-    in module order. The connector's rate limit is shared, so parallel modules never send
-    faster than `min_interval` allows."""
+    """Run the modules sequentially or `workers` at a time; findings keep module order."""
     mods = list(modules)
 
     def one(m: AttackModule) -> list[Finding]:

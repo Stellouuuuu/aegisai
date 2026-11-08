@@ -19,9 +19,9 @@ def test_risk_scoring() -> None:
     harder = assess([finding(Severity.HIGH, Confidence.CONFIRMED, tried=5)])[0]
     assert harder.exploitability == 0.5 and harder.risk_score == 3.75
     flaky = assess([finding(Severity.HIGH, Confidence.NEEDS_REVIEW, hits=1)])[0]
-    assert flaky.exploitability == 0.5  # (1 + 1) / (3 + 1): the first hit counts
+    assert flaky.exploitability == 0.5
     never = assess([finding(Severity.CRITICAL, Confidence.NEEDS_REVIEW, hits=0)])[0]
-    assert never.risk_score == 1.25  # observed once: not zero
+    assert never.risk_score == 1.25
 
 
 def test_security_score_bounds() -> None:

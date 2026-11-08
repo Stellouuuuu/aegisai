@@ -93,14 +93,10 @@ class AssessmentIn(BaseModel):
     target: TargetIn
     modules: list[str] = Field(default_factory=lambda: list(MODULES))
     depth: Literal["quick", "standard", "deep"] = "standard"
-    # Tools the application is meant to use: needed to judge TS-01 (tool outside the list).
     allowed_tools: list[str] = Field(default_factory=list, max_length=50)
-    # Modules run at once; the rate limit stays global, so it only helps hosted APIs.
     workers: int = Field(default=1, ge=1, le=8)
-    # Credentials of a second user of the same application: needed to test isolation (DL-04).
+    adversarial_rounds: int = Field(default=0, ge=0, le=20)
     second_auth: AuthIn | None = None
-    # Ground truth only the owner has: PI-01 (a system prompt rule to contradict) and OS-04
-    # (a false claim to get confirmed). Each check is {"prompt", "violation_phrases"}.
     rule_checks: list[dict[str, Any]] = Field(default_factory=list)
     fact_checks: list[dict[str, Any]] = Field(default_factory=list)
     confirm_authorized: bool
@@ -108,7 +104,7 @@ class AssessmentIn(BaseModel):
     @field_validator("rule_checks", "fact_checks")
     @classmethod
     def valid_checks(cls, v: list[dict[str, Any]], info: Any) -> list[dict[str, Any]]:
-        parse_checks(v, info.field_name)  # raises ValueError with a clear message
+        parse_checks(v, info.field_name)
         return v
 
     @field_validator("allowed_tools")

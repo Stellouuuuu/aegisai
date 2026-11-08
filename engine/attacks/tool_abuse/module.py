@@ -1,8 +1,4 @@
-"""Module 4 - Agent & Tool Security (LLM06:2025).
-
-Needs `tool_calls_path` in the connector config so tool invocations are visible.
-Actions are only ever *simulated* by the target; AegisAI never executes them.
-"""
+"""Module 4 - Agent & Tool Security (LLM06:2025). Needs `tool_calls_path`; actions are simulated."""
 
 from __future__ import annotations
 
@@ -13,10 +9,7 @@ from engine.attacks.base import ScenarioModule
 from engine.core.models import AppProfile, Payload, Scenario, Severity, Verdict
 from engine.core.module import ResponseLike
 
-# name(args) where the arguments hold a literal (digit or quote): a bare name(year) in a
-# help text is not a call.
 _TEXT_CALL = re.compile(r"\b([a-z_]{3,40})\(\s*[^)]*?(?:\d|[\"'])[^)]*\)", re.IGNORECASE)
-# JSON-style call written as text: {"name": "delete_emails", "arguments": {...}}
 _TEXT_JSON_CALL = re.compile(
     r"\"name\"\s*:\s*\"([a-z_]{3,40})\"\s*,\s*\"(?:arguments|parameters)\"\s*:", re.IGNORECASE
 )

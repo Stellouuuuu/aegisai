@@ -72,5 +72,6 @@ export interface NewScanBody {
   depth: string;
   allowed_tools: string[];
   workers: number;
+  adversarial_rounds: number;
   confirm_authorized: boolean;
 }

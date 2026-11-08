@@ -70,7 +70,7 @@ class Storage:
         with self._conn() as c:
             c.executescript(SCHEMA)
             cols = {r["name"] for r in c.execute("PRAGMA table_info(projects)")}
-            if "user_id" not in cols:  # databases created before accounts existed
+            if "user_id" not in cols:
                 c.execute("ALTER TABLE projects ADD COLUMN user_id INTEGER REFERENCES users(id)")
 
     @contextmanager
@@ -84,7 +84,6 @@ class Storage:
         finally:
             conn.close()
 
-    # users and sessions
     def create_user(self, email: str, password_hash: str) -> dict[str, Any] | None:
         try:
             with self._conn() as c:
@@ -124,7 +123,6 @@ class Storage:
         with self._conn() as c:
             c.execute("DELETE FROM sessions WHERE token_hash=?", (token_hash,))
 
-    # projects
     def create_project(
         self, user_id: int, name: str, description: str, app_type: str
     ) -> dict[str, Any]:
@@ -147,7 +145,6 @@ class Storage:
             rows = c.execute("SELECT * FROM projects WHERE user_id=? ORDER BY id DESC", (user_id,))
             return [dict(r) for r in rows]
 
-    # assessments
     @staticmethod
     def _assessment(row: sqlite3.Row) -> dict[str, Any]:
         d = dict(row)
@@ -191,7 +188,6 @@ class Storage:
                 f"UPDATE assessments SET {cols} WHERE id=?", (*fields.values(), assessment_id)
             )
 
-    # findings
     @staticmethod
     def _finding(row: sqlite3.Row) -> dict[str, Any]:
         d = dict(row)

@@ -11,6 +11,7 @@ import httpx
 
 from backend.ssrf import TargetPolicy
 from backend.storage import Storage, now
+from engine.adversarial import adapt_scan
 from engine.attacks.registry import build_modules, module_class_by_id
 from engine.connector import AuthConfig, HttpConnector, IngestConfig, TargetConfig
 from engine.core.models import Finding
@@ -77,7 +78,7 @@ def run_assessment(
 
     a = storage.get_assessment(assessment_id)
     assert a is not None
-    if stopped():  # cancelled before it even started
+    if stopped():
         storage.update_assessment(assessment_id, status="cancelled", finished_at=now())
         cancel.clear(assessment_id)
         return
@@ -112,7 +113,7 @@ def run_assessment(
         workers = int(options.get("workers", 1))
         repeats = DEPTH_REPEATS[a["depth"]]
         findings: list[Finding] = []
-        if workers > 1:  # modules run together, so there is no per-module progress to report
+        if workers > 1:
             findings = run_scan(connector, modules, repeats, should_stop=stopped, workers=workers)
         else:
             for i, module in enumerate(modules, 1):
@@ -120,6 +121,11 @@ def run_assessment(
                 if stopped():
                     break
                 storage.update_assessment(assessment_id, progress=round(100 * i / len(modules)))
+        rounds = int(options.get("adversarial_rounds", 0))
+        if rounds and not stopped():
+            findings += adapt_scan(
+                connector, modules, findings, rounds, repeats, should_stop=stopped
+            )
         cancelled = stopped()
         assess(findings)
         storage.add_findings(assessment_id, [f.to_dict() for f in findings])

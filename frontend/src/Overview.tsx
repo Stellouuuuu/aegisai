@@ -7,8 +7,8 @@ import { Chip, Empty, ErrorNote, Gauge, Icon, SeverityBars, Sparkline } from "./
 
 interface Summary {
   project: Project;
-  assessments: Assessment[]; // newest first
-  findings: FindingRow[]; // findings of the latest completed assessment
+  assessments: Assessment[];
+  findings: FindingRow[];
 }
 
 async function loadSummaries(): Promise<Summary[]> {

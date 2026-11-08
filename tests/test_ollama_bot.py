@@ -106,7 +106,7 @@ def test_vulnerable_bot_retrieves_other_users_documents() -> None:
 
 def test_hardened_bot_isolates_documents_per_user_and_fences_passages() -> None:
     system, doc = _ask_with_documents("hardened")
-    assert doc not in system  # B cannot retrieve A's document
+    assert doc not in system
     seen: list = []
     c = make("hardened", seen=seen)
     c.post("/documents", json={"id": "d1", "text": doc}, headers={"Authorization": "a"})
@@ -117,4 +117,4 @@ def test_hardened_bot_isolates_documents_per_user_and_fences_passages() -> None:
     c.delete("/documents/d1", headers={"Authorization": "a"})
     c.post("/chat", json={"message": "Que contient AEGISDOCABC123 ?"},
            headers={"Authorization": "a"})
-    assert doc not in seen[-1]["messages"][0]["content"]  # deleted documents are gone
+    assert doc not in seen[-1]["messages"][0]["content"]
