@@ -29,6 +29,8 @@ Ce n'est pas un détecteur de mots-clés dans du code : il teste le **comporteme
 
 ## Essayer en 1 minute
 
+![Scan du labo vulnérable puis du labo corrigé en ligne de commande](./docs/images/demo-terminal.gif)
+
 Aucune application cible, aucune clef d'API : AegisAI embarque un labo volontairement vulnérable et sa variante corrigée.
 
 **Option A : en ligne de commande (Python 3.11+)**
