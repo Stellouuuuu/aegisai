@@ -29,6 +29,8 @@ Ce n'est pas un détecteur de mots-clés dans du code : il teste le **comporteme
 
 ## Essayer en 1 minute
 
+**[Démo en ligne](https://frontend-gules-omega-jfkd1wvsaa.vercel.app)** : le dashboard avec les rapports des deux labos, sans rien installer. Elle est en lecture seule (on parcourt les failles et leurs preuves, mais aucun scan ne peut être lancé).
+
 ![Scan du labo vulnérable puis du labo corrigé en ligne de commande](./docs/images/demo-terminal.gif)
 
 Aucune application cible, aucune clef d'API : AegisAI embarque un labo volontairement vulnérable et sa variante corrigée.
