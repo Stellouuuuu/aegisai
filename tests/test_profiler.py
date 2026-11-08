@@ -58,7 +58,7 @@ def test_sources_field_and_wording_point_to_rag() -> None:
     )
     p = profile_target(Fake(["I have no tools.", second]))
     assert p.app_type is AppType.RAG and p.confidence == "high"
-    assert p.modules == ["prompt_injection", "data_leakage", "output"]
+    assert p.modules == ["prompt_injection", "data_leakage", "output", "rag"]
     assert p.to_app_profile().has_documents
 
 

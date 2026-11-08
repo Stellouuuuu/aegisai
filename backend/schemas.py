@@ -54,6 +54,16 @@ class AuthIn(BaseModel):
         return self
 
 
+class IngestIn(BaseModel):
+    """Where documents can be added to a RAG application's knowledge base."""
+
+    url: str = Field(pattern=r"^https?://")
+    method: Literal["POST", "PUT"] = "POST"
+    request_template: Any = {"id": "{{DOC_ID}}", "text": "{{DOCUMENT}}"}
+    delete_url: str | None = Field(default=None, pattern=r"^https?://")
+    delete_method: Literal["DELETE", "POST"] = "DELETE"
+
+
 class TargetIn(BaseModel):
     url: str = Field(pattern=r"^https?://")
     method: Literal["POST", "PUT", "GET"] = "POST"
@@ -64,6 +74,7 @@ class TargetIn(BaseModel):
     min_interval: float = Field(default=0.2, ge=0, le=60)
     timeout: float = Field(default=30, gt=0, le=300)
     stream: bool = False
+    ingest: IngestIn | None = None
 
 
 class ProfileIn(BaseModel):

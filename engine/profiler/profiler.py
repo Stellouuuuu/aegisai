@@ -148,4 +148,6 @@ def profile_target(connector: HttpConnector) -> Profile:
     modules = list(BASE_MODULES)
     if agent > 0:
         modules.append("tool_abuse")
+    if rag > 0:
+        modules.append("rag")  # only plays if the owner configured an ingest endpoint
     return Profile(app_type, confidence, signals, tools, modules)

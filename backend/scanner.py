@@ -12,7 +12,7 @@ import httpx
 from backend.ssrf import TargetPolicy
 from backend.storage import Storage, now
 from engine.attacks.registry import build_modules, module_class_by_id
-from engine.connector import AuthConfig, HttpConnector, TargetConfig
+from engine.connector import AuthConfig, HttpConnector, IngestConfig, TargetConfig
 from engine.core.models import Finding
 from engine.orchestrator import run_module, run_scan
 from engine.profiler import profile_target
@@ -55,6 +55,7 @@ def target_config(cfg: dict[str, Any]) -> TargetConfig:
         min_interval=float(cfg.get("min_interval", 0.2)),
         timeout=float(cfg.get("timeout", 30)),
         stream=bool(cfg.get("stream", False)),
+        ingest=IngestConfig(**cfg["ingest"]) if cfg.get("ingest") else None,
     )
 
 
@@ -86,6 +87,10 @@ def run_assessment(
     try:
         if policy:
             policy.check(a["config"]["url"])  # re-checked right before connecting
+            ingest = a["config"].get("ingest") or {}
+            for url in (ingest.get("url"), ingest.get("delete_url")):
+                if url:
+                    policy.check(url)
         connector = make_connector(a["config"], client_factory)
         if a["config"].get("second_auth"):
             connector.peer = make_connector(

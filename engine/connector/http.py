@@ -60,6 +60,20 @@ class AuthConfig:
 
 
 @dataclass(frozen=True)
+class IngestConfig:
+    """How to add and remove a document in a RAG application's knowledge base. Placeholders:
+    {{DOC_ID}} and {{DOCUMENT}} in the request template, {{DOC_ID}} in the delete URL."""
+
+    url: str
+    method: str = "POST"
+    request_template: Any = field(
+        default_factory=lambda: {"id": "{{DOC_ID}}", "text": "{{DOCUMENT}}"}
+    )
+    delete_url: str | None = None  # e.g. https://app/documents/{{DOC_ID}}; None = no cleanup
+    delete_method: str = "DELETE"
+
+
+@dataclass(frozen=True)
 class TargetConfig:
     url: str
     method: str = "POST"
@@ -72,6 +86,7 @@ class TargetConfig:
     # Server-sent events (OpenAI style "stream": true). The stream is reassembled into the
     # ordinary non-streaming shape, so response_path stays the same.
     stream: bool = False
+    ingest: IngestConfig | None = None  # RAG applications: where documents can be added
 
 
 @dataclass(frozen=True)
@@ -154,6 +169,24 @@ def render_template(template: Any, prompt: str, session: str = "") -> Any:
     return template
 
 
+def _fill(template: Any, values: dict[str, str]) -> Any:
+    """Substitute {{KEY}} placeholders in every string of a JSON-like template."""
+    if isinstance(template, str):
+        if template.lstrip().startswith(("{", "[")):
+            try:
+                return _fill(json.loads(template), values)
+            except json.JSONDecodeError:
+                pass
+        for key, value in values.items():
+            template = template.replace("{{" + key + "}}", value)
+        return template
+    if isinstance(template, dict):
+        return {k: _fill(v, values) for k, v in template.items()}
+    if isinstance(template, list):
+        return [_fill(v, values) for v in template]
+    return template
+
+
 def _messages_list(template: Any) -> list[Any] | None:
     """The OpenAI style "messages" list of a request template, if it has a user message."""
     data = template
@@ -224,17 +257,67 @@ class HttpConnector:
         )
 
     def send_payload(self, payload: Any) -> TargetResponse:
-        """One request, a whole conversation when the payload has turns, or a cross-user attack
-        when it has a plant: the main user speaks first, then the second user asks."""
-        if getattr(payload, "plant", ()):
-            if self.peer is None:
+        """One request, a whole conversation when the payload has turns, or a staged attack:
+        documents are added to the knowledge base and messages planted as the main user, then
+        the question is asked (as the second user for isolation scenarios). Documents are
+        always removed afterwards."""
+        documents = getattr(payload, "documents", ())
+        plant = getattr(payload, "plant", ())
+        other = getattr(payload, "as_other_user", False)
+        if documents or plant or other:
+            if other and self.peer is None:
                 raise ConnectorError("This attack needs a second user (second_auth).")
-            for message in payload.plant:
-                self.send(message)
-            return self.peer.send(payload.text)
+            added: list[str] = []
+            try:
+                for doc_id, text in documents:
+                    self.ingest_document(doc_id, text)
+                    added.append(doc_id)
+                for message in plant:
+                    self.send(message)
+                return (self.peer if other and self.peer else self).send(payload.text)
+            finally:
+                for doc_id in added:
+                    self.delete_document(doc_id)
         if getattr(payload, "turns", ()):
             return self.converse(payload.turns)
         return self.send(payload.text)
+
+    @property
+    def supports_ingest(self) -> bool:
+        return self.config.ingest is not None
+
+    def _call(self, method: str, url: str, body: Any = None) -> int:
+        self._throttle()
+        try:
+            r = self._client.request(
+                method, url, json=body, headers=self.config.auth.build_headers(),
+                timeout=self.config.timeout,
+            )
+        except httpx.HTTPError as e:
+            raise ConnectorError(f"Request to {url} failed: {e}") from e
+        self._record({"ts": datetime.now(UTC).isoformat(), "url": url, "method": method,
+                      "prompt": "(knowledge base)", "status": r.status_code})
+        if r.status_code >= 400:
+            raise ConnectorError(f"Target returned HTTP {r.status_code} on {method} {url}")
+        return r.status_code
+
+    def ingest_document(self, doc_id: str, text: str) -> None:
+        """Add a document to the application's knowledge base (RAG scenarios)."""
+        ing = self.config.ingest
+        if ing is None:
+            raise ConnectorError("This target has no 'ingest' configuration.")
+        body = _fill(ing.request_template, {"DOC_ID": doc_id, "DOCUMENT": text})
+        self._call(ing.method, ing.url, body)
+
+    def delete_document(self, doc_id: str) -> None:
+        """Remove a document added by ingest_document. Best effort: a failure is only logged."""
+        ing = self.config.ingest
+        if ing is None or not ing.delete_url:
+            return
+        try:
+            self._call(ing.delete_method, ing.delete_url.replace("{{DOC_ID}}", doc_id))
+        except ConnectorError as e:
+            log.warning("could not remove document %s: %s", doc_id, e)
 
     def send(
         self,

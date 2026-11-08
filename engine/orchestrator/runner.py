@@ -42,8 +42,10 @@ def run_module(
             continue  # one proven finding per scenario is enough
         if payload.turns and not connector.supports_conversation:
             continue  # a multi-turn attack needs a target that keeps the conversation
-        if payload.plant and connector.peer is None:
+        if (payload.plant or payload.as_other_user) and connector.peer is None:
             continue  # a cross-user attack needs a second identity
+        if payload.documents and not connector.supports_ingest:
+            continue  # a RAG attack needs a way to add documents to the knowledge base
         tried[sid] = tried.get(sid, 0) + 1
         try:
             response = connector.send_payload(payload)

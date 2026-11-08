@@ -158,6 +158,10 @@ def create_app(
         own_project(project_id, user)
         try:
             policy.check(body.target.url)
+            if body.target.ingest:  # the knowledge base endpoint is a target too
+                policy.check(body.target.ingest.url)
+                if body.target.ingest.delete_url:
+                    policy.check(body.target.ingest.delete_url)
         except TargetNotAllowedError as e:
             raise HTTPException(422, str(e)) from e
         config = body.target.model_dump()

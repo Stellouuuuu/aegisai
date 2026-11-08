@@ -12,7 +12,7 @@ from typing import Any
 import httpx
 
 from engine.attacks.registry import MODULES, build_modules
-from engine.connector import AuthConfig, ConnectorError, HttpConnector, TargetConfig
+from engine.connector import AuthConfig, ConnectorError, HttpConnector, IngestConfig, TargetConfig
 from engine.connector.presets import OPENAI_URL, openai_config
 from engine.demo import DemoUnavailableError, start_demo_lab
 from engine.orchestrator import run_scan
@@ -58,6 +58,7 @@ def _target_from(cfg: dict[str, Any]) -> TargetConfig:
         timeout=float(cfg.get("timeout", 30)),
         min_interval=float(cfg.get("min_interval", 0.2)),
         stream=bool(cfg.get("stream", False)),
+        ingest=IngestConfig(**cfg["ingest"]) if cfg.get("ingest") else None,
     )
 
 
@@ -76,6 +77,8 @@ def _module_options(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, 
         out["tool_abuse"] = {
             "allowed_tools": tuple(allowed.split(",") if isinstance(allowed, str) else allowed)
         }
+    if canary:
+        out["rag"] = {"canary": canary}
     if cfg.get("rule_checks"):
         out["prompt_injection"] = {"rule_checks": cfg["rule_checks"]}
     if cfg.get("fact_checks"):

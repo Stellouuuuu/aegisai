@@ -38,6 +38,11 @@ export const MODULES: Record<string, { label: string; owasp: string; blurb: stri
     owasp: "LLM06",
     blurb: "Can an injected instruction trigger a destructive tool call?",
   },
+  rag: {
+    label: "RAG knowledge base",
+    owasp: "LLM08",
+    blurb: "Can a planted document hijack answers or expose other users' data? Needs an ingest endpoint.",
+  },
 };
 
 export const DEPTHS = [

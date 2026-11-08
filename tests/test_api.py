@@ -291,3 +291,18 @@ def test_second_user_credentials_are_stored_as_references_and_redacted(
     assert ok.json()["config"]["second_auth"]["token"] == "***"
     literal = scan(api, pid, second_auth={"type": "bearer", "token": "plain-secret"})
     assert literal.status_code == 422
+
+
+def test_ingest_endpoint_is_checked_by_the_ssrf_policy(api: TestClient) -> None:
+    pid = new_project(api)
+    for ingest in ({"url": "http://169.254.169.254/documents"},
+                   {"url": "http://testserver/documents", "delete_url": "http://10.0.0.5/x"}):
+        target = {**TARGET, "ingest": ingest}
+        bad = api.post(
+            f"/projects/{pid}/assessments", json={"target": target, "confirm_authorized": True}
+        )
+        assert bad.status_code == 422
+    good = {**TARGET, "ingest": {"url": "http://testserver/documents",
+                                   "delete_url": "http://testserver/documents/{{DOC_ID}}"}}
+    ok = api.post(f"/projects/{pid}/assessments", json={"target": good, "confirm_authorized": True})
+    assert ok.status_code == 202

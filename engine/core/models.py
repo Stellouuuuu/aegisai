@@ -51,6 +51,11 @@ class Payload:
     # Messages sent first as the application's main user (the victim), before `text` is sent as
     # a second, unrelated user. Needs a second identity (`second_auth`) on the connector.
     plant: tuple[str, ...] = ()
+    # Documents (id, text) added to the application's knowledge base before the question, by the
+    # main user, then removed. Needs an `ingest` endpoint on the connector (RAG scenarios).
+    documents: tuple[tuple[str, str], ...] = ()
+    # Ask `text` as the second user instead of the main one (isolation scenarios).
+    as_other_user: bool = False
 
 
 @dataclass(frozen=True)

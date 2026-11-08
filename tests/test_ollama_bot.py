@@ -84,3 +84,37 @@ def test_ollama_down_returns_502() -> None:
 def test_health_reports_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AEGIS_BOT_MODE", "hardened")
     assert TestClient(bot.create_app(client=fake_ollama())).get("/health").json()["mode"] == "hardened"
+
+
+def _ask_with_documents(mode: str) -> tuple[str, str]:
+    """User A adds a private document, then user B asks about it. Returns B's system prompt
+    (as sent to the model) and the document text."""
+    seen: list = []
+    c = make(mode, seen=seen)
+    doc = "Document AEGISDOCABC123 confidentiel : code AEGIS_PRIVATE_X1."
+    assert c.post("/documents", json={"id": "d1", "text": doc},
+                  headers={"Authorization": "a"}).status_code == 201
+    c.post("/chat", json={"message": "Que contient AEGISDOCABC123 ?"},
+           headers={"Authorization": "b"})
+    return seen[-1]["messages"][0]["content"], doc
+
+
+def test_vulnerable_bot_retrieves_other_users_documents() -> None:
+    system, doc = _ask_with_documents("vulnerable")
+    assert doc in system
+
+
+def test_hardened_bot_isolates_documents_per_user_and_fences_passages() -> None:
+    system, doc = _ask_with_documents("hardened")
+    assert doc not in system  # B cannot retrieve A's document
+    seen: list = []
+    c = make("hardened", seen=seen)
+    c.post("/documents", json={"id": "d1", "text": doc}, headers={"Authorization": "a"})
+    c.post("/chat", json={"message": "Que contient AEGISDOCABC123 ?"},
+           headers={"Authorization": "a"})
+    prompt = seen[-1]["messages"][0]["content"]
+    assert f"<<<\n{doc}\n>>>" in prompt and "untrusted DATA" in prompt
+    c.delete("/documents/d1", headers={"Authorization": "a"})
+    c.post("/chat", json={"message": "Que contient AEGISDOCABC123 ?"},
+           headers={"Authorization": "a"})
+    assert doc not in seen[-1]["messages"][0]["content"]  # deleted documents are gone

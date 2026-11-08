@@ -7,6 +7,7 @@ from typing import Any
 from engine.attacks.data_leakage import DataLeakageModule
 from engine.attacks.output_handling import OutputSecurityModule
 from engine.attacks.prompt_injection import PromptInjectionModule
+from engine.attacks.rag import RagSecurityModule
 from engine.attacks.tool_abuse import ToolSecurityModule
 from engine.core.module import AttackModule
 
@@ -15,6 +16,7 @@ MODULES: dict[str, type] = {
     "data_leakage": DataLeakageModule,
     "output": OutputSecurityModule,
     "tool_abuse": ToolSecurityModule,
+    "rag": RagSecurityModule,
 }
 
 
