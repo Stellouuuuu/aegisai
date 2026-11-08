@@ -58,3 +58,8 @@ Thumbs.db
 *.bin
 models/
 datasets/
+
+# Local documents, kept out of the repository
+docs/GUIDE_NOTIONS.md
+docs/GUIDE_PROJET_AEGISAI.pdf
+docs/AegisAI_Presentation.pdf
