@@ -1,5 +1,9 @@
 import { parseApiError } from "./lib";
+import { demoApi } from "./demo/api";
 import type { Assessment, FindingRow, NewScanBody, Profile, Project } from "./types";
+
+/** Set at build time (npm run build:demo): the dashboard then runs on bundled sample reports, with no backend. */
+export const DEMO = import.meta.env.VITE_DEMO === "1";
 
 const BASE = "/api";
 const KEY = "aegis.token";
@@ -7,6 +11,7 @@ const EMAIL_KEY = "aegis.email";
 
 export const session = {
   token: (): string | null => {
+    if (DEMO) return "demo";
     try {
       return localStorage.getItem(KEY);
     } catch {
@@ -14,6 +19,7 @@ export const session = {
     }
   },
   email: (): string => {
+    if (DEMO) return "demo@aegisai.dev";
     try {
       return localStorage.getItem(EMAIL_KEY) ?? "";
     } catch {
@@ -83,7 +89,7 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T>(path: string, body?: unknown) =>
   json<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
 
-export const api = {
+const liveApi = {
   register: (email: string, password: string) => post("/auth/register", { email, password }),
   login: (email: string, password: string) =>
     post<{ access_token: string }>("/auth/login", { email, password }),
@@ -105,6 +111,8 @@ export const api = {
   reportJson: (id: number) => json<unknown>(`/assessments/${id}/report`),
   reportPdf: async (id: number): Promise<Blob> => (await raw(`/assessments/${id}/report.pdf`)).blob(),
 };
+
+export const api: typeof liveApi = DEMO ? (demoApi as unknown as typeof liveApi) : liveApi;
 
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

@@ -1,0 +1,17 @@
+{
+  "report_version": "1",
+  "generated_at": "2026-11-08T11:13:25.902340+00:00",
+  "target": "http://127.0.0.1:42811/chat",
+  "modules": [
+    "prompt_injection",
+    "data_leakage",
+    "output",
+    "tool_abuse"
+  ],
+  "depth": "standard",
+  "duration_seconds": 10.4,
+  "requests_sent": 53,
+  "security_score": 100,
+  "summary": {},
+  "findings": []
+}

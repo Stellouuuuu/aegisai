@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { api, session } from "./api";
+import { api, DEMO, session } from "./api";
 import { go } from "./hooks";
 import { useLoad } from "./hooks";
 import { Icon } from "./ui";
@@ -66,12 +66,24 @@ export function Shell({
           <span className="ellipsis" title={session.email()}>
             {session.email()}
           </span>
-          <button className="icon-btn" title="Sign out" onClick={signOut}>
-            <Icon name="out" />
-          </button>
+          {!DEMO && (
+            <button className="icon-btn" title="Sign out" onClick={signOut}>
+              <Icon name="out" />
+            </button>
+          )}
         </div>
       </aside>
-      <main className="main">{children}</main>
+      <main className="main">
+        {DEMO && (
+          <p className="demo-banner" role="note">
+            Live demo, read only. These are the sample reports of a deliberately vulnerable chatbot.{" "}
+            <a href="https://github.com/Stellouuuuu/aegisai" target="_blank" rel="noopener">
+              Get the code to scan your own app
+            </a>
+          </p>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

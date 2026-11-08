@@ -163,6 +163,8 @@ Le formulaire de scan propose aussi la liste des outils autorisés (pour TS-01) 
 
 Créez un compte, ajoutez une cible, lancez un scan sur `http://localhost:8011/chat` avec le champ « Tool calls location » réglé sur `$.tool_calls`.
 
+**Mode démo, sans API ni compte.** `cd frontend && npm run build:demo` construit le dashboard avec les deux rapports d'exemple de [`docs/examples/`](./docs/examples) intégrés, en lecture seule : on peut parcourir les failles et ouvrir leurs preuves, mais aucun scan ne peut être lancé. Ce build est un site statique (`frontend/vercel.json` le décrit pour un hébergement de type Vercel) : il n'attaque rien et ne coûte rien à héberger.
+
 ### 3. Docker (une commande)
 
 ```bash

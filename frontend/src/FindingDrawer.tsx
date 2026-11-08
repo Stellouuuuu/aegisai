@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "./api";
+import { api, DEMO } from "./api";
+import { READ_ONLY } from "./demo/api";
 import { extractProofTokens, highlight } from "./lib";
 import type { FindingRow } from "./types";
 import { Chip, Icon, SevDot } from "./ui";
@@ -44,6 +45,10 @@ export function FindingDrawer({
   }, [onClose]);
 
   async function retest() {
+    if (DEMO) {
+      setVerdict(READ_ONLY);
+      return;
+    }
     setBusy(true);
     onError(null);
     setVerdict(null);
