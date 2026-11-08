@@ -90,7 +90,7 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Exécution parallèle des modules (`--workers`, aussi dans l'API et le dashboard) | fait |
 | 15 des 20 scénarios du catalogue MVP | fait |
 | Module RAG (v2, premier jalon : document piégé, secret extrait, isolation des documents) | fait |
-| Attaques adaptatives (v3 : `--adversarial`, réécritures guidées par les réponses, attaquant LLM optionnel) | fait, mesuré sur Mistral |
+| Attaques adaptatives (v3 : `--adversarial`, réécritures guidées par les réponses, attaquant LLM optionnel) | fait, mesuré sur Mistral avec un témoin : le gain sur de simples répétitions est faible |
 | Export SARIF et revue statique du code (6 règles, heuristiques, v4 minimal) | fait |
 | Analyse de flux de données (white-box complet) | à faire |
 
