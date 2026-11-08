@@ -14,7 +14,7 @@ from backend.storage import Storage, now
 from engine.attacks.registry import build_modules, module_class_by_id
 from engine.connector import AuthConfig, HttpConnector, TargetConfig
 from engine.core.models import Finding
-from engine.orchestrator import run_module
+from engine.orchestrator import run_module, run_scan
 from engine.profiler import profile_target
 from engine.reporting import build_report
 from engine.risk_engine import assess, security_score
@@ -90,15 +90,22 @@ def run_assessment(
         ok, msg = connector.test_connection()
         if not ok:
             raise RuntimeError(f"Connection test failed: {msg}")
-        modules = build_modules(a["modules"])
+        options = a["config"].get("options", {})
+        allowed = tuple(options.get("allowed_tools") or ())
+        modules = build_modules(
+            a["modules"], {"tool_abuse": {"allowed_tools": allowed}} if allowed else None
+        )
+        workers = int(options.get("workers", 1))
+        repeats = DEPTH_REPEATS[a["depth"]]
         findings: list[Finding] = []
-        for i, module in enumerate(modules, 1):
-            findings += run_module(
-                connector, module, repeats=DEPTH_REPEATS[a["depth"]], should_stop=stopped
-            )
-            if stopped():
-                break
-            storage.update_assessment(assessment_id, progress=round(100 * i / len(modules)))
+        if workers > 1:  # modules run together, so there is no per-module progress to report
+            findings = run_scan(connector, modules, repeats, should_stop=stopped, workers=workers)
+        else:
+            for i, module in enumerate(modules, 1):
+                findings += run_module(connector, module, repeats=repeats, should_stop=stopped)
+                if stopped():
+                    break
+                storage.update_assessment(assessment_id, progress=round(100 * i / len(modules)))
         cancelled = stopped()
         assess(findings)
         storage.add_findings(assessment_id, [f.to_dict() for f in findings])

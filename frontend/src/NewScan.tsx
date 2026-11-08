@@ -16,6 +16,8 @@ export function NewScan({ projectId }: { projectId: number }) {
   const [headerName, setHeaderName] = useState("X-API-Key");
   const [modules, setModules] = useState<string[]>(Object.keys(MODULES));
   const [depth, setDepth] = useState("standard");
+  const [allowedTools, setAllowedTools] = useState("");
+  const [workers, setWorkers] = useState(1);
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -100,6 +102,8 @@ export function NewScan({ projectId }: { projectId: number }) {
         target,
         modules,
         depth,
+        allowed_tools: allowedTools.split(",").map((t) => t.trim()).filter(Boolean),
+        workers,
         confirm_authorized: confirmed,
       });
       go(`/assessments/${a.id}`);
@@ -236,6 +240,34 @@ export function NewScan({ projectId }: { projectId: number }) {
               </label>
             ))}
           </div>
+          {modules.includes("tool_abuse") && (
+            <label>
+              <span>Allowed tools (optional)</span>
+              <input
+                value={allowedTools}
+                onChange={(e) => setAllowedTools(e.target.value)}
+                placeholder="lookup_order, get_invoice"
+              />
+              <small>
+                Comma-separated tools the application is meant to use. Without this list the
+                "tool outside the allowed list" test is skipped, because it cannot be judged.
+              </small>
+            </label>
+          )}
+          <label>
+            <span>Parallel modules</span>
+            <select value={workers} onChange={(e) => setWorkers(Number(e.target.value))}>
+              {[1, 2, 4, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n === 1 ? "1 (sequential, with progress)" : n}
+                </option>
+              ))}
+            </select>
+            <small>
+              Useful for hosted APIs. On a local model with a single GPU it is slower. The rate
+              limit stays global either way.
+            </small>
+          </label>
         </section>
 
         <section className="card form-card">

@@ -61,7 +61,7 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Labo vulnérable (vulnérable et corrigé) | fait |
 | Profiler (chatbot, agent, RAG) et annulation de scan | fait |
 | Connecteur compatible OpenAI et streaming | fait |
-| Exécution parallèle des modules (`--workers`) | fait |
+| Exécution parallèle des modules (`--workers`, aussi dans l'API et le dashboard) | fait |
 | 15 des 20 scénarios du catalogue MVP | fait |
 | 5 scénarios restants (multi-tours, multi-utilisateurs, RAG) | à faire |
 | RAG (v2), adversarial (v3), white-box et SARIF (v4) | à faire |
@@ -128,6 +128,8 @@ cd vulnerable-lab && uvicorn chatbot.app:app --port 8011
 # Terminal 3 : le dashboard
 cd frontend && npm install && npm run dev        # http://localhost:5173
 ```
+
+Le formulaire de scan propose aussi la liste des outils autorisés (pour TS-01) et le nombre de modules en parallèle ; l'API les accepte sous les noms `allowed_tools` et `workers`.
 
 Créez un compte, ajoutez une cible, lancez un scan sur `http://localhost:8011/chat` avec le champ « Tool calls location » réglé sur `$.tool_calls`.
 

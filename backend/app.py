@@ -155,9 +155,9 @@ def create_app(
             policy.check(body.target.url)
         except TargetNotAllowedError as e:
             raise HTTPException(422, str(e)) from e
-        a = storage.create_assessment(
-            project_id, body.target.model_dump(), body.modules, body.depth
-        )
+        config = body.target.model_dump()
+        config["options"] = {"allowed_tools": body.allowed_tools, "workers": body.workers}
+        a = storage.create_assessment(project_id, config, body.modules, body.depth)
         background.add_task(
             scanner.run_assessment, storage, a["id"], client_factory, policy, cancel
         )

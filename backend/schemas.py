@@ -81,7 +81,19 @@ class AssessmentIn(BaseModel):
     target: TargetIn
     modules: list[str] = Field(default_factory=lambda: list(MODULES))
     depth: Literal["quick", "standard", "deep"] = "standard"
+    # Tools the application is meant to use: needed to judge TS-01 (tool outside the list).
+    allowed_tools: list[str] = Field(default_factory=list, max_length=50)
+    # Modules run at once; the rate limit stays global, so it only helps hosted APIs.
+    workers: int = Field(default=1, ge=1, le=8)
     confirm_authorized: bool
+
+    @field_validator("allowed_tools")
+    @classmethod
+    def clean_tools(cls, v: list[str]) -> list[str]:
+        tools = [t.strip() for t in v if t.strip()]
+        if any(len(t) > 100 for t in tools):
+            raise ValueError("tool names must be at most 100 characters")
+        return tools
 
     @field_validator("modules")
     @classmethod

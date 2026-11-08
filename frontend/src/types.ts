@@ -70,5 +70,7 @@ export interface NewScanBody {
   target: Record<string, unknown>;
   modules: string[];
   depth: string;
+  allowed_tools: string[];
+  workers: number;
   confirm_authorized: boolean;
 }
