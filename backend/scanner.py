@@ -87,6 +87,10 @@ def run_assessment(
         if policy:
             policy.check(a["config"]["url"])  # re-checked right before connecting
         connector = make_connector(a["config"], client_factory)
+        if a["config"].get("second_auth"):
+            connector.peer = make_connector(
+                {**a["config"], "auth": a["config"]["second_auth"]}, client_factory
+            )
         ok, msg = connector.test_connection()
         if not ok:
             raise RuntimeError(f"Connection test failed: {msg}")

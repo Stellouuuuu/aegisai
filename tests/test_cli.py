@@ -98,3 +98,24 @@ def test_cli_scan_with_auto_modules_uses_the_profile(tmp_path, monkeypatch, caps
     report = json.loads(out.read_text())
     assert "tool_abuse" in report["modules"]
     assert "Profile: agent" in capsys.readouterr().err
+
+
+def test_second_auth_bearer_enables_the_cross_user_scenario(tmp_path, monkeypatch) -> None:
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from chatbot import app as lab
+    from engine.cli import main
+
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    monkeypatch.setenv("USER_A", "token-a")
+    monkeypatch.setenv("USER_B", "token-b")
+    out = tmp_path / "r.json"
+    args = ["scan", "--url", "http://testserver/chat", "--tool-calls-path", "$.tool_calls",
+            "--modules", "data_leakage", "--min-interval", "0", "--confirm-authorized",
+            "--auth-bearer", "${USER_A}", "--out", str(out)]
+    main(args, TestClient(lab.app))
+    assert "DL-04" not in {f["id"] for f in json.loads(out.read_text())["findings"]}
+    main(args + ["--second-auth-bearer", "${USER_B}"], TestClient(lab.app))
+    assert "DL-04" in {f["id"] for f in json.loads(out.read_text())["findings"]}

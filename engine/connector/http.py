@@ -177,6 +177,8 @@ class HttpConnector:
         self._last_sent = 0.0
         self._lock = threading.Lock()  # one rate limit and one audit trail for all threads
         self.history: list[dict[str, Any]] = []  # structured audit trail (ENF-05)
+        # A second user of the same application (other credentials), for isolation tests.
+        self.peer: HttpConnector | None = None
 
     def _throttle(self) -> None:
         # Holding the lock while sleeping serialises request starts, so min_interval is a
@@ -222,7 +224,14 @@ class HttpConnector:
         )
 
     def send_payload(self, payload: Any) -> TargetResponse:
-        """One request, or a whole conversation when the payload has turns."""
+        """One request, a whole conversation when the payload has turns, or a cross-user attack
+        when it has a plant: the main user speaks first, then the second user asks."""
+        if getattr(payload, "plant", ()):
+            if self.peer is None:
+                raise ConnectorError("This attack needs a second user (second_auth).")
+            for message in payload.plant:
+                self.send(message)
+            return self.peer.send(payload.text)
         if getattr(payload, "turns", ()):
             return self.converse(payload.turns)
         return self.send(payload.text)

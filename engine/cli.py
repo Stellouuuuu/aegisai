@@ -36,6 +36,16 @@ def load_config(path: str) -> dict[str, Any]:
     return json.loads(text)
 
 
+def _peer_from(
+    cfg: dict[str, Any], client: httpx.Client | None
+) -> HttpConnector | None:
+    """The connector of a second user (same application, other credentials), if configured."""
+    if not cfg.get("second_auth"):
+        return None
+    other = {**cfg, "auth": cfg["second_auth"]}
+    return HttpConnector(_target_from(other), client=client)
+
+
 def _target_from(cfg: dict[str, Any]) -> TargetConfig:
     auth = AuthConfig(**cfg.get("auth", {}))
     return TargetConfig(
@@ -94,6 +104,8 @@ def _config_from_args(args: argparse.Namespace) -> dict[str, Any]:
         cfg["auth"] = {"type": "none"}
     if args.auth_bearer:
         cfg["auth"] = {"type": "bearer", "token": args.auth_bearer}
+    if args.second_auth_bearer:
+        cfg["second_auth"] = {"type": "bearer", "token": args.second_auth_bearer}
     if args.min_interval is not None:
         cfg["min_interval"] = args.min_interval
     if args.timeout is not None:
@@ -137,6 +149,7 @@ def _scan(args: argparse.Namespace, client: httpx.Client | None) -> int:
                     else cfg.get("modules") or list(MODULES))
     try:
         connector = HttpConnector(_target_from(cfg), client=client)
+        connector.peer = _peer_from(cfg, client)
         if not auto:
             modules = build_modules(module_names, _module_options(args, cfg))
     except (KeyError, TypeError) as e:
@@ -229,6 +242,10 @@ def _add_target_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--response-path", help="JSONPath of the reply, e.g. $.reply")
     p.add_argument("--tool-calls-path", help="JSONPath of reported tool calls")
     p.add_argument("--auth-bearer", help="Bearer token, or ${ENV_VAR}")
+    p.add_argument(
+        "--second-auth-bearer",
+        help="Bearer token (or ${ENV_VAR}) of a second user, to test isolation between users",
+    )
     p.add_argument("--no-auth", action="store_true", help="send no credentials (local servers)")
     p.add_argument(
         "--preset", choices=["openai"],

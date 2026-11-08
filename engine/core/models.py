@@ -48,6 +48,9 @@ class Payload:
     # A conversation: the user messages sent one after the other in the same session. When set,
     # `text` is only a readable summary of it.
     turns: tuple[str, ...] = ()
+    # Messages sent first as the application's main user (the victim), before `text` is sent as
+    # a second, unrelated user. Needs a second identity (`second_auth`) on the connector.
+    plant: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

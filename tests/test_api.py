@@ -279,3 +279,15 @@ def test_api_accepts_rule_and_fact_checks(api: TestClient, monkeypatch) -> None:
 def test_api_rejects_bad_checks(api: TestClient) -> None:
     pid = new_project(api)
     assert scan(api, pid, rule_checks=[{"prompt": "q", "violation_phrases": []}]).status_code == 422
+
+
+def test_second_user_credentials_are_stored_as_references_and_redacted(
+    api: TestClient, monkeypatch
+) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    pid = new_project(api)
+    ok = scan(api, pid, second_auth={"type": "bearer", "token": "${SECOND_USER_TOKEN}"})
+    assert ok.status_code == 202
+    assert ok.json()["config"]["second_auth"]["token"] == "***"
+    literal = scan(api, pid, second_auth={"type": "bearer", "token": "plain-secret"})
+    assert literal.status_code == 422

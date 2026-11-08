@@ -40,6 +40,11 @@ def _redact(assessment: dict[str, Any]) -> dict[str, Any]:
     if auth.get("token"):
         auth["token"] = "***"
     auth["headers"] = {k: "***" for k in auth.get("headers", {})}
+    other = a["config"].get("second_auth")
+    if other:
+        if other.get("token"):
+            other["token"] = "***"
+        other["headers"] = {k: "***" for k in other.get("headers", {})}
     return a
 
 
@@ -156,6 +161,8 @@ def create_app(
         except TargetNotAllowedError as e:
             raise HTTPException(422, str(e)) from e
         config = body.target.model_dump()
+        if body.second_auth:
+            config["second_auth"] = body.second_auth.model_dump()
         config["options"] = {
             "allowed_tools": body.allowed_tools, "workers": body.workers,
             "rule_checks": body.rule_checks, "fact_checks": body.fact_checks,

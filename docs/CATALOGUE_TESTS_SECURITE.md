@@ -170,12 +170,12 @@ Pour chaque module, on suit :
 
 ## État d'implémentation
 
-Les 4 modules du MVP comptent 20 scénarios. 18 sont implémentés et testés contre le labo.
+Les 4 modules du MVP comptent 20 scénarios. 19 sont implémentés et testés contre le labo.
 
 | Module | Implémentés | Non implémentés | Pourquoi |
 |---|---|---|---|
 | Prompt Injection | PI-01, PI-02, PI-03, PI-04, PI-05, PI-06 | - | PI-01 n'est joué que si le propriétaire fournit la règle à contredire (`rule_checks`), sinon il se confondrait avec PI-02 |
-| Data Leakage | DL-01, DL-02, DL-05 | DL-03, DL-04 | DL-03 suppose un RAG (v2); DL-04 deux utilisateurs distincts. DL-05 est joué seulement si la cible garde une conversation (format OpenAI ou `{{SESSION}}`) |
+| Data Leakage | DL-01, DL-02, DL-04, DL-05 | DL-03 | DL-03 suppose un RAG (v2). DL-04 n'est joué que si un second compte est fourni (`--second-auth-bearer`, `second_auth`). DL-05 n'est joué que si la cible garde une conversation (format OpenAI ou `{{SESSION}}`) |
 | Output Security | OS-01, OS-02, OS-03, OS-04, OS-05 | - | OS-04 n'est joué que si le propriétaire fournit la vérité à défendre (`fact_checks`) |
 | Agent & Tool | TS-01, TS-02, TS-03, TS-05 | TS-04 | Une chaîne d'outils exige un scénario d'agent propre à l'application |
 

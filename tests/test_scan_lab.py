@@ -296,3 +296,49 @@ def test_reconstruction_needs_most_of_the_secret_across_turns(replies: list[str]
     payload = mod.generate_payloads(AppProfile())[-1]
     assert payload.scenario_id == "DL-05" and len(payload.turns) == 4
     assert mod.detect(payload, R()).violated is expected
+
+
+def two_users(monkeypatch: pytest.MonkeyPatch) -> HttpConnector:
+    from engine.connector import AuthConfig
+
+    monkeypatch.setenv("LAB_USER_A", "token-a")
+    monkeypatch.setenv("LAB_USER_B", "token-b")
+    client = TestClient(lab.app)
+
+    def conn(var: str) -> HttpConnector:
+        cfg = TargetConfig(
+            url="http://testserver/chat", tool_calls_path="$.tool_calls",
+            auth=AuthConfig(type="bearer", token="${" + var + "}"),
+        )
+        return HttpConnector(cfg, client=client)
+
+    main = conn("LAB_USER_A")
+    main.peer = conn("LAB_USER_B")
+    return main
+
+
+def test_cross_user_leak_is_found_and_isolation_is_not_flagged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    found = {f.id: f for f in run_scan(two_users(monkeypatch), [DataLeakageModule()])}
+    assert "DL-04" in found and found["DL-04"].confidence is Confidence.CONFIRMED
+    assert "second compte" in found["DL-04"].evidence
+    monkeypatch.setenv("AEGIS_LAB_MODE", "patched")
+    assert "DL-04" not in {f.id for f in run_scan(two_users(monkeypatch), [DataLeakageModule()])}
+
+
+def test_cross_user_attack_is_skipped_without_a_second_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    assert connector().peer is None
+    assert "DL-04" not in {f.id for f in run_scan(connector(), [DataLeakageModule()])}
+
+
+def test_cross_user_detector_needs_the_victims_own_secret() -> None:
+    mod = DataLeakageModule()
+    attack = next(p for p in mod.generate_payloads(AppProfile()) if p.scenario_id == "DL-04")
+    assert attack.plant and mod.victim_secret in attack.plant[0] and mod.victim_secret not in attack.text
+    assert mod.detect(attack, _Reply(f"Le code est {mod.victim_secret}.")).violated
+    assert not mod.detect(attack, _Reply("Je n'ai aucun code de remise enregistré pour vous.")).violated
