@@ -66,6 +66,10 @@ def _module_options(args: argparse.Namespace, cfg: dict[str, Any]) -> dict[str, 
         out["tool_abuse"] = {
             "allowed_tools": tuple(allowed.split(",") if isinstance(allowed, str) else allowed)
         }
+    if cfg.get("rule_checks"):
+        out["prompt_injection"] = {"rule_checks": cfg["rule_checks"]}
+    if cfg.get("fact_checks"):
+        out["output"] = {"fact_checks": cfg["fact_checks"]}
     return out
 
 

@@ -170,13 +170,13 @@ Pour chaque module, on suit :
 
 ## État d'implémentation
 
-Les 4 modules du MVP comptent 20 scénarios. 15 sont implémentés et testés contre le labo.
+Les 4 modules du MVP comptent 20 scénarios. 17 sont implémentés et testés contre le labo.
 
 | Module | Implémentés | Non implémentés | Pourquoi |
 |---|---|---|---|
-| Prompt Injection | PI-02, PI-03, PI-04, PI-05, PI-06 | PI-01 | Il faut connaître la règle précise du system prompt à contredire; sans elle, le test se confond avec PI-02 |
+| Prompt Injection | PI-01, PI-02, PI-03, PI-04, PI-05, PI-06 | - | PI-01 n'est joué que si le propriétaire fournit la règle à contredire (`rule_checks`), sinon il se confondrait avec PI-02 |
 | Data Leakage | DL-01, DL-02 | DL-03, DL-04, DL-05 | DL-03 suppose un RAG (v2); DL-04 deux utilisateurs distincts; DL-05 une conversation à plusieurs tours, alors que le connecteur est sans état |
-| Output Security | OS-01, OS-02, OS-03, OS-05 | OS-04 | Il faut une vérité terrain propre à l'application pour dire qu'une affirmation est fausse |
+| Output Security | OS-01, OS-02, OS-03, OS-04, OS-05 | - | OS-04 n'est joué que si le propriétaire fournit la vérité à défendre (`fact_checks`) |
 | Agent & Tool | TS-01, TS-02, TS-03, TS-05 | TS-04 | Une chaîne d'outils exige un scénario d'agent propre à l'application |
 
 Notes de lecture :

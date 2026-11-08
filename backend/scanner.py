@@ -92,9 +92,14 @@ def run_assessment(
             raise RuntimeError(f"Connection test failed: {msg}")
         options = a["config"].get("options", {})
         allowed = tuple(options.get("allowed_tools") or ())
-        modules = build_modules(
-            a["modules"], {"tool_abuse": {"allowed_tools": allowed}} if allowed else None
-        )
+        module_options: dict[str, dict[str, Any]] = {}
+        if allowed:
+            module_options["tool_abuse"] = {"allowed_tools": allowed}
+        if options.get("rule_checks"):
+            module_options["prompt_injection"] = {"rule_checks": options["rule_checks"]}
+        if options.get("fact_checks"):
+            module_options["output"] = {"fact_checks": options["fact_checks"]}
+        modules = build_modules(a["modules"], module_options)
         workers = int(options.get("workers", 1))
         repeats = DEPTH_REPEATS[a["depth"]]
         findings: list[Finding] = []

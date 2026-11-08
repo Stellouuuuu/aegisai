@@ -63,4 +63,4 @@ def test_patched_no_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_known_vulns_cover_planted_scenarios() -> None:
     assert set(ATTACKS) | {"TS-02", "TS-03", "TS-05"} == set(lab.KNOWN_VULNS)
-    assert set(lab.NEEDS_CONFIG) == {"TS-01"}
+    assert set(lab.NEEDS_CONFIG) == {"TS-01", "PI-01", "OS-04"}

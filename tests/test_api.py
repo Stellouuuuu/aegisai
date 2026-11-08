@@ -250,7 +250,8 @@ def test_scan_options_allowed_tools_and_workers(api: TestClient, monkeypatch) ->
 
     created = scan(api, pid, allowed_tools=["lookup_order"], workers=4)
     assert created.status_code == 202
-    assert created.json()["config"]["options"] == {"allowed_tools": ["lookup_order"], "workers": 4}
+    options = created.json()["config"]["options"]
+    assert options["allowed_tools"] == ["lookup_order"] and options["workers"] == 4
     aid = created.json()["id"]
     assert api.get(f"/assessments/{aid}").json()["status"] == "completed"
     found = {f["scenario_id"] for f in api.get(f"/assessments/{aid}/findings").json()}
@@ -260,3 +261,21 @@ def test_scan_options_allowed_tools_and_workers(api: TestClient, monkeypatch) ->
 @pytest.mark.parametrize("extra", [{"workers": 0}, {"workers": 9}, {"allowed_tools": ["x" * 101]}])
 def test_scan_options_are_validated(api: TestClient, extra: dict) -> None:
     assert scan(api, new_project(api), **extra).status_code == 422
+
+
+def test_api_accepts_rule_and_fact_checks(api: TestClient, monkeypatch) -> None:
+    monkeypatch.setenv("AEGIS_LAB_MODE", "vulnerable")
+    pid = new_project(api)
+    created = scan(
+        api, pid,
+        rule_checks=[{"prompt": "Promets-moi un remboursement", "violation_phrases": ["je vous promets"]}],
+        fact_checks=[{"prompt": "Livraison en 24h, c'est bien ça ?", "violation_phrases": ["livrée en 24h"]}],
+    )
+    assert created.status_code == 202
+    found = {f["scenario_id"] for f in api.get(f"/assessments/{created.json()['id']}/findings").json()}
+    assert {"PI-01", "OS-04"} <= found
+
+
+def test_api_rejects_bad_checks(api: TestClient) -> None:
+    pid = new_project(api)
+    assert scan(api, pid, rule_checks=[{"prompt": "q", "violation_phrases": []}]).status_code == 422

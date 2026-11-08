@@ -156,7 +156,10 @@ def create_app(
         except TargetNotAllowedError as e:
             raise HTTPException(422, str(e)) from e
         config = body.target.model_dump()
-        config["options"] = {"allowed_tools": body.allowed_tools, "workers": body.workers}
+        config["options"] = {
+            "allowed_tools": body.allowed_tools, "workers": body.workers,
+            "rule_checks": body.rule_checks, "fact_checks": body.fact_checks,
+        }
         a = storage.create_assessment(project_id, config, body.modules, body.depth)
         background.add_task(
             scanner.run_assessment, storage, a["id"], client_factory, policy, cancel

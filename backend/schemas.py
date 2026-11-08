@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from engine.attacks.custom_checks import parse_checks
 from engine.attacks.registry import MODULES
 
 _ENV_REF = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*\}$")
@@ -85,7 +86,17 @@ class AssessmentIn(BaseModel):
     allowed_tools: list[str] = Field(default_factory=list, max_length=50)
     # Modules run at once; the rate limit stays global, so it only helps hosted APIs.
     workers: int = Field(default=1, ge=1, le=8)
+    # Ground truth only the owner has: PI-01 (a system prompt rule to contradict) and OS-04
+    # (a false claim to get confirmed). Each check is {"prompt", "violation_phrases"}.
+    rule_checks: list[dict[str, Any]] = Field(default_factory=list)
+    fact_checks: list[dict[str, Any]] = Field(default_factory=list)
     confirm_authorized: bool
+
+    @field_validator("rule_checks", "fact_checks")
+    @classmethod
+    def valid_checks(cls, v: list[dict[str, Any]], info: Any) -> list[dict[str, Any]]:
+        parse_checks(v, info.field_name)  # raises ValueError with a clear message
+        return v
 
     @field_validator("allowed_tools")
     @classmethod
