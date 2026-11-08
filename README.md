@@ -233,7 +233,7 @@ Pour tester une base de connaissances, AegisAI doit pouvoir y **ajouter un docum
 }
 ```
 
-Chaque attaque ajoute un document avec des jetons uniques, pose une question qui le fait récupérer, puis le supprime : RAG-01 cache une consigne dans le document, DL-03 lui fait demander le secret du contexte, RAG-02 ajoute un document privé avec le compte principal et le fait lire par le second, RAG-04 fait ajouter un faux fait par le second compte et vérifie que le compte principal le reçoit, RAG-05 pose une question générique et regarde si un document sans lien revient (`second_auth` requis pour ces trois derniers). **Renseignez `delete_url`** : sans lui, les documents de test restent dans votre base. Sans `ingest`, le module ne joue rien.
+Chaque attaque ajoute un document avec des jetons uniques, pose une question qui le fait récupérer, puis le supprime : RAG-01 cache une consigne dans le document, DL-03 lui fait demander le secret du contexte, RAG-02 ajoute un document privé avec le compte principal et le fait lire par le second, RAG-04 fait ajouter un faux fait par le second compte et vérifie que le compte principal le reçoit, RAG-05 pose une question générique et regarde si un document sans lien revient (`second_auth` requis pour ces trois derniers). Si votre application reçoit les fichiers bruts plutôt que du JSON, ajoutez `"content_type": "text/plain"` (le modèle `request_template` devient alors le corps brut, par exemple `"{{DOCUMENT}}"`), des `headers` (par exemple `{"X-Filename": "{{DOC_ID}}.txt"}`) et `"id_path": "$.document.id"` si l'application choisit elle-même l'identifiant du document et le renvoie : il sert alors à le supprimer. **Renseignez `delete_url`** : sans lui, les documents de test restent dans votre base. Sans `ingest`, le module ne joue rien.
 
 ### Isolation entre utilisateurs (DL-04)
 
@@ -246,6 +246,10 @@ aegis scan --url https://mon-app.com/api/chat --auth-bearer '${USER_A}' \
 ```
 
 Dans l'API, le champ `second_auth` prend le même format que `auth` (références `${VARIABLE}` uniquement). Sans second compte, le scénario est ignoré.
+
+### Un cas réel : l'audit de Mnemo
+
+AegisAI a servi à auditer un assistant local construit à côté, Mnemo (chat, mémoire, RAG). Premier scan : 45 sur 100, avec des injections de prompt confirmées et un fragment du prompt système restitué ; après deux correctifs (règles du prompt et garde côté serveur contre la fuite des instructions), 74 puis 81 sur 100. Le rapport trie aussi ce qui n'a pas été corrigé et pourquoi : [`audit-v0.4.md`](https://github.com/Stellouuuuu/stella-ai/blob/main/docs/securite/audit-v0.4.md).
 
 ## Comment une faille est prouvée
 
