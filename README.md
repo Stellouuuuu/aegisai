@@ -66,9 +66,9 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | 5 scénarios restants (multi-tours, multi-utilisateurs, RAG) | à faire |
 | RAG (v2), adversarial (v3), white-box et SARIF (v4) | à faire |
 
-**Validation sur un vrai LLM (Mistral via Ollama, 5 scans par mode) :** score moyen 62 sur la variante vulnérable contre 99,2 sur la variante durcie, avec un rappel de 4/5 à 5/5 selon le scénario (TS-02 détecté en "à vérifier" seulement, le modèle écrivant ses appels d'outil en texte) et aucun faux positif confirmé sur la variante durcie. Détails et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
+**Validation sur un vrai LLM (Mistral via Ollama, scan complet des 15 scénarios, 5 scans par mode) :** score de 14 à 45 (moyenne 24,8) sur la variante vulnérable contre 73 à 85 (moyenne 78,8) sur la variante durcie. Les failles ciblées par le durcissement (fuite de canary et de system prompt, HTML non échappé, outils) disparaissent ; les scénarios que le durcissement ne vise pas (persona, injection) restent détectés, car le modèle y obéit réellement. Détails, rappel par scénario et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
 
-**Limites connues :** le labo est un simulateur à règles (pas un vrai LLM), donc les chiffres ci-dessus prouvent que la chaîne fonctionne, pas la qualité des payloads face à un vrai modèle. 15 scénarios du catalogue MVP sur 20 sont implémentés ; les 5 autres demandent des conversations à plusieurs tours, plusieurs utilisateurs ou un RAG (voir le catalogue). Sur un vrai LLM le rappel est partiel et dépend du scénario : certains ne se déclenchent jamais sur Mistral (TS-03, TS-05). Voir [`ROADMAP.md`](./ROADMAP.md).
+**Limites connues :** le labo est un simulateur à règles (pas un vrai LLM), donc les chiffres ci-dessus prouvent que la chaîne fonctionne, pas la qualité des payloads face à un vrai modèle. 15 scénarios du catalogue MVP sur 20 sont implémentés ; les 5 autres demandent des conversations à plusieurs tours, plusieurs utilisateurs ou un RAG (voir le catalogue). Sur un vrai LLM le rappel est partiel et dépend du scénario : certains ne se déclenchent presque jamais sur Mistral (PI-04, TS-05) et les appels d'outil écrits en texte (TS-02, TS-03) restent à vérifier. Voir [`ROADMAP.md`](./ROADMAP.md).
 
 ## Démarrage rapide
 
