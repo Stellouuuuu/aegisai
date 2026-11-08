@@ -7,6 +7,7 @@
 **Un scanner black-box pour les applications qui intègrent des modèles d'IA**
 *(chatbots, agents, systèmes RAG, API LLM)*
 
+[![CI](https://github.com/Stellouuuuu/aegisai/actions/workflows/ci.yml/badge.svg)](https://github.com/Stellouuuuu/aegisai/actions/workflows/ci.yml)
 ![Status](https://img.shields.io/badge/status-MVP%20fonctionnel-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.11+-3776AB)
@@ -25,6 +26,24 @@
 AegisAI se connecte à une application IA via son API, lui envoie des **scénarios d'attaque** rattachés à l'OWASP LLM Top 10 et à MITRE ATLAS, **prouve** chaque vulnérabilité avec une preuve rejouable, en **évalue la gravité**, puis produit un **rapport d'audit** avec des recommandations.
 
 Ce n'est pas un détecteur de mots-clés dans du code : il teste le **comportement réel** d'une application en fonctionnement.
+
+## Aperçu
+
+<div align="center">
+
+![Vue d'ensemble du dashboard](./docs/images/dashboard-overview.png)
+
+*Vue d'ensemble : un labo vulnérable (score 0) et sa variante corrigée (score 100).*
+
+![Rapport d'un scan](./docs/images/scan-report.png)
+
+*Un scan : gravité, statut de preuve (confirmed ou needs review) et risque calculé pour chaque faille.*
+
+![Détail d'une faille](./docs/images/finding-proof.png)
+
+*Une faille prouvée : l'attaque envoyée, la réponse de l'application, la règle violée et le correctif conseillé.*
+
+</div>
 
 ## État du projet
 
@@ -54,7 +73,7 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 ## Démarrage rapide
 
 ```bash
-git clone https://github.com/<user>/aegisai.git && cd aegisai
+git clone https://github.com/Stellouuuuu/aegisai.git && cd aegisai
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 pytest                                   # la suite doit passer
@@ -189,7 +208,6 @@ aegisai/
 
 ## Documentation
 
-- [`docs/GUIDE_NOTIONS.md`](./docs/GUIDE_NOTIONS.md) : les concepts expliqués simplement
 - [`docs/CAHIER_DES_CHARGES.md`](./docs/CAHIER_DES_CHARGES.md) : spécifications du MVP
 - [`docs/CATALOGUE_TESTS_SECURITE.md`](./docs/CATALOGUE_TESTS_SECURITE.md) : scénarios et référentiels
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md), [`ROADMAP.md`](./ROADMAP.md), [`CONTRIBUTING.md`](./CONTRIBUTING.md)
