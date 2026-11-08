@@ -78,7 +78,7 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Brique | État |
 |---|---|
 | Connecteur HTTP (template `{{PROMPT}}`, JSONPath, auth, rate limiting) | fait |
-| Modules d'attaque : Prompt Injection, Data Leakage, Output Security, Tool Security | fait, 20 scénarios sur 20 du catalogue MVP, plus 2 scénarios RAG (voir limites) |
+| Modules d'attaque : Prompt Injection, Data Leakage, Output Security, Tool Security | fait, 20 scénarios sur 20 du catalogue MVP, plus 5 scénarios RAG (voir limites) |
 | Détecteurs, évaluateurs (baseline + répétition), Risk Engine | fait |
 | Rapports JSON et PDF | fait |
 | CLI `aegis` (scan, profile, report, mode démo) | fait |
@@ -90,11 +90,12 @@ Le MVP (v1) fonctionne de bout en bout. Validé contre le labo vulnérable inclu
 | Exécution parallèle des modules (`--workers`, aussi dans l'API et le dashboard) | fait |
 | 15 des 20 scénarios du catalogue MVP | fait |
 | Module RAG (v2, premier jalon : document piégé, secret extrait, isolation des documents) | fait |
-| Autres scénarios RAG (empoisonnement de la base, filtrage au retrieval), adversarial (v3), white-box et SARIF (v4) | à faire |
+| Attaques adaptatives (v3, premier jalon : réécritures guidées par les réponses) | fait |
+| White-box (analyse du code) et export SARIF (v4) | à faire |
 
 **Validation sur un vrai LLM (Mistral via Ollama, scan complet des 15 scénarios, 5 scans par mode) :** score de 14 à 45 (moyenne 24,8) sur la variante vulnérable contre 73 à 85 (moyenne 78,8) sur la variante durcie. Les failles ciblées par le durcissement (fuite de canary et de system prompt, HTML non échappé, outils) disparaissent ; les scénarios que le durcissement ne vise pas (persona, injection) restent détectés, car le modèle y obéit réellement. Détails, rappel par scénario et limites : [`docs/VALIDATION.md`](./docs/VALIDATION.md).
 
-**Limites connues :** le labo est un simulateur à règles (pas un vrai LLM), donc les chiffres ci-dessus prouvent que la chaîne fonctionne, pas la qualité des payloads face à un vrai modèle. les 20 scénarios du catalogue MVP et 2 scénarios RAG sont implémentés ; PI-01, OS-04 et DL-04 n'ont pas été mesurés sur un vrai modèle (ils dépendent de vos règles ou de vos comptes), et le module RAG l'a été sur Mistral avec un petit échantillon (voir la validation). Sur un vrai LLM le rappel est partiel et dépend du scénario : certains ne se déclenchent presque jamais sur Mistral (PI-04, TS-05) et les appels d'outil écrits en texte (TS-02, TS-03) restent à vérifier. Voir [`ROADMAP.md`](./ROADMAP.md).
+**Limites connues :** le labo est un simulateur à règles (pas un vrai LLM), donc les chiffres ci-dessus prouvent que la chaîne fonctionne, pas la qualité des payloads face à un vrai modèle. Les 20 scénarios du catalogue MVP et 5 scénarios RAG sont implémentés ; PI-01, OS-04 et DL-04 n'ont pas été mesurés sur un vrai modèle (ils dépendent de vos règles ou de vos comptes), et le module RAG l'a été sur Mistral avec un petit échantillon (voir la validation). Sur un vrai LLM le rappel est partiel et dépend du scénario : certains ne se déclenchent presque jamais sur Mistral (PI-04, TS-05) et les appels d'outil écrits en texte (TS-02, TS-03) restent à vérifier. Voir [`ROADMAP.md`](./ROADMAP.md).
 
 ## Démarrage rapide
 
@@ -179,7 +180,7 @@ et les comptes sont conservés dans le volume `aegis-data`.
 | Prompt Injection | LLM01 | PI-01 (règle du system prompt contredite, avec `rule_checks`), PI-02 (ignorer les consignes), PI-03 (persona), PI-04 (document piégé), PI-05 (encodé, langue tierce), PI-06 (format détourné) |
 | Data Leakage | LLM02 / LLM07 | DL-01 (canary), DL-02 (system prompt), DL-04 (donnée d'un autre utilisateur, voir ci-dessous), DL-05 (secret reconstitué sur plusieurs tours, voir ci-dessous) |
 | Output Security | LLM05 | OS-01 (HTML/JS non échappé), OS-02 (SQL), OS-03 (shell), OS-04 (fausse affirmation confirmée, avec `fact_checks`), OS-05 (JSON non respecté) |
-| RAG | LLM08 / LLM02 | RAG-01 (consigne cachée dans un document indexé), RAG-02 (document d'un autre utilisateur), DL-03 (secret extrait par un document piégé), voir ci-dessous |
+| RAG | LLM08 / LLM02 | RAG-01 (consigne cachée dans un document indexé), RAG-02 (document d'un autre utilisateur), RAG-04 (document empoisonné servi aux autres), RAG-05 (question générique qui ramène des documents sans lien), DL-03 (secret extrait par un document piégé), voir ci-dessous |
 | Agent et Tool Security | LLM06 | TS-01 (outil hors liste, avec `--allowed-tools`), TS-02 (action destructrice), TS-03 (exfiltration), TS-05 (escalade de droits) |
 
 Catalogue complet (y compris les scénarios prévus) : [`docs/CATALOGUE_TESTS_SECURITE.md`](./docs/CATALOGUE_TESTS_SECURITE.md).
@@ -230,7 +231,7 @@ Pour tester une base de connaissances, AegisAI doit pouvoir y **ajouter un docum
 }
 ```
 
-Chaque attaque ajoute un document avec des jetons uniques, pose une question qui le fait récupérer, puis le supprime : RAG-01 cache une consigne dans le document, DL-03 lui fait demander le secret du contexte, RAG-02 ajoute un document privé avec le compte principal et le fait lire par le second (`second_auth` requis). **Renseignez `delete_url`** : sans lui, les documents de test restent dans votre base. Sans `ingest`, le module ne joue rien.
+Chaque attaque ajoute un document avec des jetons uniques, pose une question qui le fait récupérer, puis le supprime : RAG-01 cache une consigne dans le document, DL-03 lui fait demander le secret du contexte, RAG-02 ajoute un document privé avec le compte principal et le fait lire par le second, RAG-04 fait ajouter un faux fait par le second compte et vérifie que le compte principal le reçoit, RAG-05 pose une question générique et regarde si un document sans lien revient (`second_auth` requis pour ces trois derniers). **Renseignez `delete_url`** : sans lui, les documents de test restent dans votre base. Sans `ingest`, le module ne joue rien.
 
 ### Isolation entre utilisateurs (DL-04)
 
